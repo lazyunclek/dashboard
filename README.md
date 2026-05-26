@@ -6,7 +6,7 @@ Public static dashboard for market watchlists and other GitHub Pages-friendly ou
 
 - `index.html`: public landing page
 - `data/stocks.js`: watchlist snapshot used by the page
-- `data/stock-details.js`: public stock-detail bundle rendered by the detail panel
+- `data/stock-details.js`: public stock-detail bundle rendered inside each expanded stock card
 - `scripts/build_stock_detail_data.py`: rebuilds `data/stock-details.js` from local `../stock/**/*.md`
 
 ## Update flow
@@ -14,11 +14,11 @@ Public static dashboard for market watchlists and other GitHub Pages-friendly ou
 The page is still static, but now it reads two public data layers:
 
 1. `data/stocks.js` for the watchlist snapshot, priority, entry/add zones, and summary cards
-2. `data/stock-details.js` for each selected stock's fundamental notes, tracking points, risks, and source links
+2. `data/stock-details.js` for each stock's fundamental notes, tracking points, risks, and source links
 
 `data/stock-details.js` is generated from the local research notes under `stock/`, but the deployed site reads only the bundled public files inside the `dashboard/` repo.
 
-When a user clicks a stock row, the dashboard loads that stock note and renders:
+When a user expands a stock card, the dashboard loads that stock note and renders inline:
 
 - latest fundamental bullets
 - tracking points
