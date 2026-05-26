@@ -321,17 +321,6 @@
         font-size: 0.84rem;
       }
 
-      .stock-layout {
-        display: grid;
-        grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.95fr);
-        gap: 20px;
-        align-items: start;
-      }
-
-      .table-panel {
-        padding-bottom: 18px;
-      }
-
       .table-toolbar {
         padding: 20px 20px 8px;
       }
@@ -342,30 +331,135 @@
         line-height: 1.7;
       }
 
-      .stock-row {
-        cursor: pointer;
-        transition: background 160ms ease;
+      .stock-list {
+        display: grid;
+        gap: 14px;
+        padding: 0 20px 20px;
       }
 
-      .stock-row:focus-visible {
+      .stock-card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.56);
+        overflow: hidden;
+      }
+
+      .stock-card.is-open {
+        background: rgba(255, 250, 244, 0.92);
+        box-shadow: 0 14px 30px rgba(68, 42, 24, 0.08);
+      }
+
+      .stock-toggle {
+        width: 100%;
+        padding: 18px;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .stock-toggle:focus-visible {
         outline: 2px solid rgba(182, 61, 43, 0.44);
         outline-offset: -2px;
       }
 
-      .stock-company {
+      .stock-toggle-top {
         display: flex;
-        flex-direction: column;
-        gap: 3px;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
       }
 
-      .stock-company small {
+      .stock-title {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .stock-headline {
+        margin: 0;
+        font-size: 1.22rem;
+        line-height: 1.1;
+      }
+
+      .stock-subtitle {
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .stock-toggle-side {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .stock-toggle-indicator {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.64);
+        font-size: 1.1rem;
+        line-height: 1;
+      }
+
+      .stock-stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .stock-stat {
+        padding: 12px 14px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--line);
+        background: rgba(255, 250, 244, 0.72);
+      }
+
+      .stock-stat-label {
+        margin: 0 0 6px;
+        font-size: 0.78rem;
+        color: var(--muted);
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .stock-stat-value {
+        margin: 0;
+        line-height: 1.5;
+      }
+
+      .stock-zones {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .stock-chip {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.68);
         color: var(--muted);
       }
 
-      .detail-panel {
-        position: sticky;
-        top: 18px;
-        padding: 22px;
+      .stock-chip strong {
+        color: var(--ink);
+      }
+
+      .stock-detail {
+        padding: 0 18px 18px;
+        border-top: 1px solid var(--line);
       }
 
       .detail-topline {
@@ -374,6 +468,7 @@
         justify-content: space-between;
         gap: 12px;
         align-items: flex-start;
+        padding-top: 18px;
       }
 
       .ticker-lockup {
@@ -483,7 +578,7 @@
           grid-template-columns: 1fr;
         }
 
-        .stock-layout,
+        .stock-stats,
         .detail-meta-grid {
           grid-template-columns: 1fr;
         }
@@ -492,12 +587,12 @@
           padding: 24px;
         }
 
-        .detail-panel {
-          position: static;
-        }
-
         .table-toolbar {
           padding-bottom: 14px;
+        }
+
+        .stock-list {
+          padding-inline: 14px;
         }
       }
     </style>
@@ -552,55 +647,24 @@
         </aside>
       </div>
 
-      <section class="section stock-layout">
-        <div class="panel table-panel">
-          <div class="table-toolbar">
-            <div class="section-head">
-              <div>
-                <h2 class="section-title">股票清單</h2>
-                <p class="section-note">
-                  先看第一進場區，再看理想加碼區。點任一股票後，右側會展開近期基本面整理、
-                  追蹤重點與重要資料來源。
-                </p>
-              </div>
-              <div class="filters" id="filters"></div>
-            </div>
-            <p class="table-caption">
-              目前清單仍以位階與風險分級為主，但閱讀順序改成「先選股，再看明細」，比一整張表更容易延伸到研究內容。
-            </p>
-          </div>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Ticker</th>
-                  <th>Company</th>
-                  <th>現價</th>
-                  <th>52 週位階</th>
-                  <th>判斷</th>
-                  <th>第一進場區</th>
-                  <th>理想加碼區</th>
-                  <th>風險備註</th>
-                  <th>優先度</th>
-                </tr>
-              </thead>
-              <tbody id="stock-rows"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <aside class="card detail-panel">
+      <section class="section panel">
+        <div class="table-toolbar">
           <div class="section-head">
             <div>
-              <h2 class="section-title">股票明細</h2>
-              <p class="section-note">從本地研究筆記讀取近期基本面與重要文件。</p>
+              <h2 class="section-title">股票清單</h2>
+              <p class="section-note">
+                改成折疊式閱讀。先看位階與進場區，想看細節就直接展開同一檔股票的基本面、
+                追蹤重點與近期重要文件。
+              </p>
             </div>
+            <div class="filters" id="filters"></div>
           </div>
-          <div id="detail-panel">
-            <p class="empty-copy">請先選一檔股票。</p>
-          </div>
-        </aside>
+          <p class="table-caption">
+            同一列展開比較適合手機瀏覽，也能讓研究內容跟該股票的位階資訊維持在一起。
+          </p>
+        </div>
+
+        <div class="stock-list" id="stock-list"></div>
       </section>
 
       <footer>
@@ -622,7 +686,7 @@
       ];
 
       let activeFilter = "all";
-      let activeTicker = data.stocks[0]?.ticker ?? null;
+      let activeTicker = null;
 
       const toPriorityClass = (priority) => {
         if (priority.startsWith("A")) return "a";
@@ -644,25 +708,6 @@
           .replaceAll(">", "&gt;")
           .replaceAll('"', "&quot;")
           .replaceAll("'", "&#39;");
-
-      const parseBullets = (sectionText = "") =>
-        sectionText
-          .split("\n")
-          .map((line) => line.trim())
-          .filter((line) => line.startsWith("- "))
-          .map((line) => line.slice(2).trim())
-          .filter(Boolean);
-
-      const parseSources = (sectionText = "") =>
-        parseBullets(sectionText).map((entry) => {
-          const matched = entry.match(/^(.+?)[：:]\s*<([^>]+)>$/);
-
-          if (matched) {
-            return { label: matched[1].trim(), url: matched[2].trim() };
-          }
-
-          return { label: entry, url: "" };
-        });
 
       const loadStockDetail = (stock) => stockDetailData[stock?.ticker] ?? null;
 
@@ -702,8 +747,7 @@
         `;
       };
 
-      const renderDetailError = (stock) => {
-        document.getElementById("detail-panel").innerHTML = `
+      const renderDetailError = (stock) => `
           <div class="detail-topline">
             <div class="ticker-lockup">
               <p class="eyebrow">Selected Stock</p>
@@ -713,23 +757,16 @@
             <span class="priority ${toPriorityClass(stock.priority)}">${stock.priority}</span>
           </div>
           <p class="empty-copy">
-            這檔股票的公開明細資料暫時缺失。你仍可先參考左側位階表，或確認 data/stock-details.js 是否已重新產生。
+            這檔股票的公開明細資料暫時缺失。你仍可先參考這張卡片的位階資訊，或確認
+            data/stock-details.js 是否已重新產生。
           </p>
         `;
-      };
 
-      const renderDetail = () => {
-        const stock = data.stocks.find((item) => item.ticker === activeTicker);
-        if (!stock) {
-          document.getElementById("detail-panel").innerHTML = `<p class="empty-copy">目前沒有可顯示的股票。</p>`;
-          return;
-        }
-
+      const renderDetail = (stock) => {
         const detail = loadStockDetail(stock);
 
         if (!detail) {
-          renderDetailError(stock);
-          return;
+          return renderDetailError(stock);
         }
 
         const title = detail?.title || `${stock.ticker}｜${stock.company}`;
@@ -740,7 +777,7 @@
         const pe = detail?.meta?.["本益比快照"] ?? "未填寫";
         const summary = detail?.summary?.trim() || stock.verdict;
 
-        document.getElementById("detail-panel").innerHTML = `
+        return `
           <div class="detail-topline">
             <div class="ticker-lockup">
               <p class="eyebrow">Selected Stock</p>
@@ -792,15 +829,14 @@
           </section>
 
           <p class="detail-footnote">
-            右側內容已打包進 dashboard 的公開資料檔，所以部署到 GitHub Pages 後也能直接看到每檔股票的基本面整理。
+            這段展開內容已打包進 dashboard 的公開資料檔，所以部署到 GitHub Pages 後也能直接看到每檔股票的基本面整理。
           </p>
         `;
       };
 
       const selectStock = (ticker) => {
-        activeTicker = ticker;
-        renderTable();
-        renderDetail();
+        activeTicker = activeTicker === ticker ? null : ticker;
+        renderStockList();
       };
 
       const renderFilters = () => {
@@ -824,12 +860,11 @@
           button.addEventListener("click", () => {
             activeFilter = button.dataset.filter;
             const visibleStocks = data.stocks.filter(matchFilter);
-            if (!visibleStocks.some((stock) => stock.ticker === activeTicker)) {
-              activeTicker = visibleStocks[0]?.ticker ?? null;
+            if (activeTicker && !visibleStocks.some((stock) => stock.ticker === activeTicker)) {
+              activeTicker = null;
             }
             renderFilters();
-            renderTable();
-            renderDetail();
+            renderStockList();
           });
         });
       };
@@ -881,53 +916,72 @@
           .join("");
       };
 
-      const renderTable = () => {
+      const renderStockList = () => {
         const visibleStocks = data.stocks.filter(matchFilter);
 
-        if (!visibleStocks.some((stock) => stock.ticker === activeTicker)) {
-          activeTicker = visibleStocks[0]?.ticker ?? null;
+        if (activeTicker && !visibleStocks.some((stock) => stock.ticker === activeTicker)) {
+          activeTicker = null;
         }
 
-        const rows = visibleStocks
-          .map(
-            (stock) => `
-              <tr
-                class="stock-row ${stock.ticker === activeTicker ? "is-selected" : ""}"
-                data-ticker="${stock.ticker}"
-                tabindex="0"
-                aria-selected="${stock.ticker === activeTicker}"
-              >
-                <td class="mono">${stock.ticker}</td>
-                <td>
-                  <div class="stock-company">
-                    <strong>${stock.company}</strong>
-                    <small>${stock.verdict}</small>
+        const cards = visibleStocks
+          .map((stock) => {
+            const isOpen = stock.ticker === activeTicker;
+            const detailMarkup = isOpen ? renderDetail(stock) : "";
+            const indicator = isOpen ? "-" : "+";
+
+            return `
+              <article class="stock-card ${isOpen ? "is-open" : ""}">
+                <button
+                  class="stock-toggle"
+                  type="button"
+                  data-ticker="${stock.ticker}"
+                  aria-expanded="${isOpen}"
+                >
+                  <div class="stock-toggle-top">
+                    <div class="stock-title">
+                      <div class="eyebrow">${stock.ticker}</div>
+                      <h3 class="stock-headline">${stock.company}</h3>
+                      <div class="stock-subtitle">${stock.verdict}</div>
+                    </div>
+                    <div class="stock-toggle-side">
+                      <span class="priority ${toPriorityClass(stock.priority)}">${stock.priority}</span>
+                      <span class="stock-toggle-indicator" aria-hidden="true">${indicator}</span>
+                    </div>
                   </div>
-                </td>
-                <td class="mono">${stock.price}</td>
-                <td class="mono">${stock.positionPercent}</td>
-                <td>${stock.verdict}</td>
-                <td class="mono">${stock.entryZone}</td>
-                <td class="mono">${stock.addZone}</td>
-                <td>${stock.riskNote}</td>
-                <td>
-                  <span class="priority ${toPriorityClass(stock.priority)}">${stock.priority}</span>
-                </td>
-              </tr>
-            `
-          )
+
+                  <div class="stock-stats">
+                    <article class="stock-stat">
+                      <p class="stock-stat-label">現價</p>
+                      <p class="stock-stat-value mono">${stock.price}</p>
+                    </article>
+                    <article class="stock-stat">
+                      <p class="stock-stat-label">52 週位階</p>
+                      <p class="stock-stat-value mono">${stock.positionPercent}</p>
+                    </article>
+                    <article class="stock-stat">
+                      <p class="stock-stat-label">第一進場區</p>
+                      <p class="stock-stat-value mono">${stock.entryZone}</p>
+                    </article>
+                    <article class="stock-stat">
+                      <p class="stock-stat-label">理想加碼區</p>
+                      <p class="stock-stat-value mono">${stock.addZone}</p>
+                    </article>
+                  </div>
+
+                  <div class="stock-zones">
+                    <span class="stock-chip"><strong>風險備註</strong>${stock.riskNote}</span>
+                  </div>
+                </button>
+                ${isOpen ? `<div class="stock-detail">${detailMarkup}</div>` : ""}
+              </article>
+            `;
+          })
           .join("");
 
-        document.getElementById("stock-rows").innerHTML = rows;
+        document.getElementById("stock-list").innerHTML = cards;
 
-        document.querySelectorAll(".stock-row").forEach((row) => {
-          row.addEventListener("click", () => selectStock(row.dataset.ticker));
-          row.addEventListener("keydown", (event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              selectStock(row.dataset.ticker);
-            }
-          });
+        document.querySelectorAll(".stock-toggle").forEach((button) => {
+          button.addEventListener("click", () => selectStock(button.dataset.ticker));
         });
       };
 
@@ -938,8 +992,7 @@
       renderKpis();
       renderIdeas();
       renderFilters();
-      renderTable();
-      renderDetail();
+      renderStockList();
     </script>
   </body>
 </html>
