@@ -289,15 +289,30 @@ function buildDashboard(raw) {
     });
   }
 
-  const canonicalSymbols = new Set(positions.map((row) => String(row.symbol).toUpperCase()));
+  const canonicalPositions = new Map(positions.map((row) => [String(row.symbol).toUpperCase(), row]));
   for (const component of components.filter((row) => row.component_type === "position_snapshot")) {
     const symbol = String(component.symbol || component.component_key || "").toUpperCase();
-    if (!symbol || canonicalSymbols.has(symbol)) continue;
+    if (!symbol) continue;
     const price = latestPrices.get(symbol);
     const marketFx = (price?.quote_currency || component.native_currency) === "TWD" ? 1 : currentFx;
     const currentValue = component.quantity !== null && price?.price !== null && price?.price !== undefined
       ? num(component.quantity) * num(price.price) * marketFx
       : num(component.net_value_twd ?? component.gross_value_twd);
+    const canonical = canonicalPositions.get(symbol);
+    if (canonical) {
+      if (canonical.marketPrice === null && component.latest_price !== null) {
+        canonical.marketPrice = num(component.latest_price);
+        canonical.marketPriceCurrency = component.native_currency;
+        canonical.marketPriceAt = component.source_updated_at;
+      }
+      if (canonical.marketValueTwd === null) {
+        canonical.marketValueTwd = currentValue;
+        canonical.unrealizedPnlTwd = currentValue - canonical.costTwd;
+        canonical.unrealizedPnlPct = canonical.costTwd > 0 ? (currentValue - canonical.costTwd) / canonical.costTwd * 100 : null;
+        canonical.totalPnlTwd = canonical.realizedPnlTwd + canonical.incomeTwd + canonical.unrealizedPnlTwd;
+      }
+      continue;
+    }
     const costTwd = num(component.cost_twd);
     positions.push({
       id: component.id,

@@ -21,6 +21,9 @@ for (const token of ["login-view", "dashboard-view", "positions-list", "transact
 for (const token of ["data-asset-ledger", "transactionQuery", "transactionType"]) {
   if (!app.includes(token)) throw new Error(`Missing ledger filter behavior: ${token}`);
 }
+for (const token of ["canonicalPositions", "component.latest_price", "component.net_value_twd ?? component.gross_value_twd"]) {
+  if (!app.includes(token)) throw new Error(`Missing position snapshot fallback: ${token}`);
+}
 for (const query of ["investment_portfolios", "investment_assets", "investment_transactions", "investment_income_events", "investment_market_prices", "investment_portfolio_component_values", "investment_grid_records"]) {
   if (!app.includes(query)) throw new Error(`Missing read source: ${query}`);
 }
