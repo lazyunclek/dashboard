@@ -4,7 +4,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const required = ["index.html", "styles.css", "app.js", "config.js", "manifest.webmanifest", "icon.svg", ".github/workflows/pages.yml"];
+const required = ["index.html", "styles.css", "app.js", "config.js", "manifest.webmanifest", "icon.svg", ".github/workflows/pages.yml", "tools/stamp-assets.mjs"];
 for (const file of required) await fs.access(path.join(root, file));
 
 const [html, css, app, config, workflow] = await Promise.all([
@@ -37,6 +37,7 @@ if (postCalls !== 1 || !app.includes("/auth/v1/token")) throw new Error("Only th
 if (!config.includes("sb_publishable_") || config.includes("__SUPABASE_")) throw new Error("Public Supabase config has not been synchronized");
 if (!css.includes("@media (max-width: 380px)") || !css.includes("@media (min-width: 680px)")) throw new Error("Responsive breakpoints missing");
 if (!workflow.includes("actions/deploy-pages")) throw new Error("GitHub Pages deployment step missing");
+if (!workflow.includes("tools/stamp-assets.mjs")) throw new Error("GitHub Pages asset cache busting step missing");
 
 console.log("Static app contract passed.");
 console.log("Verified: required files, read sources, auth-only POST, no privileged key, responsive CSS, Pages workflow.");
