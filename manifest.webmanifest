@@ -1,0 +1,17 @@
+{
+  "name": "Quant Lab 投資儀表板",
+  "short_name": "投資儀表板",
+  "description": "個人投資組合唯讀行動儀表板",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#07100b",
+  "theme_color": "#07100b",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
