@@ -297,7 +297,7 @@ function buildDashboard(raw) {
     });
   }
 
-  const canonicalPositions = new Map(positions.map((row) => [String(row.symbol).toUpperCase(), row]));
+  const canonicalPositions = new Map(positions.map((row) => [spotPositionKey(row.symbol), row]));
   for (const component of components.filter((row) => row.component_type === "position_snapshot")) {
     const symbol = String(component.symbol || component.component_key || "").toUpperCase();
     if (!symbol) continue;
@@ -306,7 +306,7 @@ function buildDashboard(raw) {
     const currentValue = component.quantity !== null && price?.price !== null && price?.price !== undefined
       ? num(component.quantity) * num(price.price) * marketFx
       : num(component.net_value_twd ?? component.gross_value_twd);
-    const canonical = canonicalPositions.get(symbol);
+    const canonical = canonicalPositions.get(spotPositionKey(symbol));
     if (canonical) {
       if (canonical.marketPrice === null && component.latest_price !== null) {
         canonical.marketPrice = num(component.latest_price);
@@ -470,6 +470,10 @@ async function loadDashboard() {
 
 function groupLabel(assetClass) {
   return ({ tw_equity: "TW", us_equity: "US", crypto: "CRYPTO" })[assetClass] || String(assetClass || "—").toUpperCase();
+}
+
+function spotPositionKey(symbol) {
+  return String(symbol || "").toUpperCase().replace(/-(?:USD|USDT|USDC)$/, "");
 }
 
 function positionCard(position) {
