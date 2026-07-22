@@ -15,8 +15,11 @@ const [html, css, app, config, workflow] = await Promise.all([
   fs.readFile(path.join(root, ".github/workflows/pages.yml"), "utf8")
 ]);
 
-for (const token of ["login-view", "dashboard-view", "positions-list", "transaction-list"]) {
+for (const token of ["login-view", "dashboard-view", "positions-list", "transaction-search", "transaction-filters", "transaction-list"]) {
   if (!html.includes(`id="${token}"`)) throw new Error(`Missing HTML target: ${token}`);
+}
+for (const token of ["data-asset-ledger", "transactionQuery", "transactionType"]) {
+  if (!app.includes(token)) throw new Error(`Missing ledger filter behavior: ${token}`);
 }
 for (const query of ["investment_portfolios", "investment_assets", "investment_transactions", "investment_income_events", "investment_market_prices", "investment_portfolio_component_values", "investment_grid_records"]) {
   if (!app.includes(query)) throw new Error(`Missing read source: ${query}`);

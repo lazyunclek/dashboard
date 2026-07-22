@@ -163,10 +163,23 @@
         <div class="section-head">
           <div>
             <p class="eyebrow">LEDGER</p>
-            <h2>最近交易</h2>
+            <h2>交易明細</h2>
           </div>
           <span id="transaction-count" class="count-badge">0</span>
         </div>
+        <div class="ledger-tools">
+          <label class="ledger-search">
+            <span class="sr-only">搜尋股票代號或名稱</span>
+            <input id="transaction-search" type="search" inputmode="search" autocomplete="off" placeholder="搜尋 2330、台積電…">
+          </label>
+          <button id="clear-transaction-search" class="clear-search" type="button" hidden>清除</button>
+        </div>
+        <div class="filter-row" id="transaction-filters" aria-label="交易類型">
+          <button class="filter-chip is-active" data-transaction-type="all" type="button">全部</button>
+          <button class="filter-chip" data-transaction-type="buy" type="button">買入</button>
+          <button class="filter-chip" data-transaction-type="sell" type="button">賣出</button>
+        </div>
+        <p id="transaction-filter-note" class="filter-note"></p>
         <div id="transaction-list" class="transaction-list"></div>
 
         <div class="section-head income-head">
