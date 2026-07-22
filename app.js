@@ -468,6 +468,12 @@ function positionCard(position) {
   const details = document.createElement("details");
   details.className = "position-card";
   const pnl = num(position.unrealizedPnlTwd);
+  const hasPnl = position.marketValueTwd !== null && position.unrealizedPnlTwd !== null;
+  const pnlAmount = hasPnl ? money(pnl, "TWD", true) : "—";
+  const pnlPercent = position.unrealizedPnlPct === null
+    ? "—"
+    : `${position.unrealizedPnlPct >= 0 ? "+" : ""}${position.unrealizedPnlPct.toFixed(2)}%`;
+  const pnlTone = !hasPnl ? "" : pnl >= 0 ? "is-positive" : "is-negative";
   details.innerHTML = `
     <summary>
       <span class="position-identity">
@@ -476,14 +482,14 @@ function positionCard(position) {
       </span>
       <span class="position-value">
         <strong class="private-number">${money(position.marketValueTwd)}</strong>
-        <small class="private-number ${pnl >= 0 ? "is-positive" : "is-negative"}">${money(pnl, "TWD", true)}</small>
+        <small class="private-number position-return ${pnlTone}"><span>${pnlAmount}</span><span aria-hidden="true">·</span><span>${pnlPercent}</span></small>
       </span>
     </summary>
     <div class="position-details">
       <span class="position-detail"><span>持有數量</span><strong class="private-number">${quantity(position.quantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</strong></span>
       <span class="position-detail"><span>最新價格</span><strong class="private-number">${position.marketPrice === null ? "—" : money(position.marketPrice, position.marketPriceCurrency)}</strong></span>
       <span class="position-detail"><span>剩餘成本</span><strong class="private-number">${money(position.costTwd)}</strong></span>
-      <span class="position-detail"><span>未實現報酬</span><strong class="private-number ${pnl >= 0 ? "is-positive" : "is-negative"}">${position.unrealizedPnlPct === null ? "零成本／待補" : `${pnl >= 0 ? "+" : ""}${position.unrealizedPnlPct.toFixed(2)}%`}</strong></span>
+      <span class="position-detail"><span>未實現報酬</span><strong class="private-number ${pnlTone}">${position.unrealizedPnlPct === null ? "零成本／待補" : pnlPercent}</strong></span>
       <span class="position-detail"><span>主題</span><strong>${escapeHtml(position.subTheme)}</strong></span>
       <span class="position-detail"><span>行情時間</span><strong>${dateTime(position.marketPriceAt)}</strong></span>
     </div>
