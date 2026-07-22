@@ -20,6 +20,8 @@ const state = {
   data: null,
   activeTab: "overview",
   marketFilter: "all",
+  transactionQuery: "",
+  transactionType: "all",
   numbersHidden: window.localStorage.getItem(storageKeys.privacy) === "true",
   loading: false
 };
@@ -287,15 +289,30 @@ function buildDashboard(raw) {
     });
   }
 
-  const canonicalSymbols = new Set(positions.map((row) => String(row.symbol).toUpperCase()));
+  const canonicalPositions = new Map(positions.map((row) => [String(row.symbol).toUpperCase(), row]));
   for (const component of components.filter((row) => row.component_type === "position_snapshot")) {
     const symbol = String(component.symbol || component.component_key || "").toUpperCase();
-    if (!symbol || canonicalSymbols.has(symbol)) continue;
+    if (!symbol) continue;
     const price = latestPrices.get(symbol);
     const marketFx = (price?.quote_currency || component.native_currency) === "TWD" ? 1 : currentFx;
     const currentValue = component.quantity !== null && price?.price !== null && price?.price !== undefined
       ? num(component.quantity) * num(price.price) * marketFx
       : num(component.net_value_twd ?? component.gross_value_twd);
+    const canonical = canonicalPositions.get(symbol);
+    if (canonical) {
+      if (canonical.marketPrice === null && component.latest_price !== null) {
+        canonical.marketPrice = num(component.latest_price);
+        canonical.marketPriceCurrency = component.native_currency;
+        canonical.marketPriceAt = component.source_updated_at;
+      }
+      if (canonical.marketValueTwd === null) {
+        canonical.marketValueTwd = currentValue;
+        canonical.unrealizedPnlTwd = currentValue - canonical.costTwd;
+        canonical.unrealizedPnlPct = canonical.costTwd > 0 ? (currentValue - canonical.costTwd) / canonical.costTwd * 100 : null;
+        canonical.totalPnlTwd = canonical.realizedPnlTwd + canonical.incomeTwd + canonical.unrealizedPnlTwd;
+      }
+      continue;
+    }
     const costTwd = num(component.cost_twd);
     positions.push({
       id: component.id,
@@ -469,7 +486,8 @@ function positionCard(position) {
       <span class="position-detail"><span>未實現報酬</span><strong class="private-number ${pnl >= 0 ? "is-positive" : "is-negative"}">${position.unrealizedPnlPct === null ? "零成本／待補" : `${pnl >= 0 ? "+" : ""}${position.unrealizedPnlPct.toFixed(2)}%`}</strong></span>
       <span class="position-detail"><span>主題</span><strong>${escapeHtml(position.subTheme)}</strong></span>
       <span class="position-detail"><span>行情時間</span><strong>${dateTime(position.marketPriceAt)}</strong></span>
-    </div>`;
+    </div>
+    <button class="position-ledger-button" type="button" data-asset-ledger="${escapeHtml(position.id)}" data-symbol="${escapeHtml(position.symbol)}">查看 ${escapeHtml(position.displaySymbol)} 成交紀錄 →</button>`;
   return details;
 }
 
@@ -490,11 +508,22 @@ function renderPositions() {
 }
 
 function renderActivity() {
-  const transactions = state.data.transactions.filter((row) => row.details?.event_role !== "asset_fee");
+  const query = state.transactionQuery.trim().toLocaleLowerCase("zh-Hant");
+  const transactions = state.data.transactions.filter((row) => {
+    if (row.details?.event_role === "asset_fee") return false;
+    if (state.transactionType !== "all" && row.transaction_type !== state.transactionType) return false;
+    if (!query) return true;
+    const asset = state.data.assetsById.get(row.asset_id) || {};
+    return [asset.symbol, asset.name].some((value) => String(value || "").toLocaleLowerCase("zh-Hant").includes(query));
+  });
   byId("transaction-count").textContent = transactions.length;
+  byId("transaction-filter-note").textContent = query
+    ? `找到 ${transactions.length} 筆符合「${state.transactionQuery.trim()}」的成交紀錄`
+    : `共 ${transactions.length} 筆成交紀錄`;
+  byId("clear-transaction-search").hidden = !state.transactionQuery;
   const transactionList = byId("transaction-list");
   transactionList.replaceChildren();
-  for (const row of transactions.slice(0, 40)) {
+  for (const row of transactions) {
     const asset = state.data.assetsById.get(row.asset_id) || {};
     const item = document.createElement("article");
     item.className = "transaction-row";
@@ -502,7 +531,7 @@ function renderActivity() {
     const label = ({ buy: "買入", sell: "賣出", transfer_in: "轉入", transfer_out: "轉出", adjustment: "調整", split: "分割" })[row.transaction_type] || row.transaction_type;
     item.innerHTML = `
       <span class="transaction-type ${isSell ? "is-sell" : ""}">${escapeHtml(label)}</span>
-      <span class="transaction-copy"><strong>${escapeHtml(asset.symbol || "—")} · ${escapeHtml(asset.name || "未命名標的")}</strong><small>${shortDate(row.trade_date)} · ${escapeHtml(row.settlement_currency)}</small></span>
+      <span class="transaction-copy"><strong>${escapeHtml(asset.symbol || "—")} · ${escapeHtml(asset.name || "未命名標的")}</strong><small>${shortDate(row.trade_date)} · ${escapeHtml(row.settlement_currency)}</small><small class="transaction-costs private-number">手續費 ${money(row.fee_amount || 0, row.settlement_currency)} · 稅 ${money(row.tax_amount || 0, row.settlement_currency)}</small></span>
       <span class="transaction-amount"><strong class="private-number">${quantity(row.quantity, asset.quantity_scale)} ${escapeHtml(asset.quantity_unit || "")}</strong><small class="private-number">${row.unit_price === null ? "無成交價" : money(row.unit_price, row.settlement_currency)}</small></span>`;
     transactionList.append(item);
   }
@@ -611,11 +640,41 @@ loginForm.addEventListener("submit", async (event) => {
 
 document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => showTab(tab.dataset.tab)));
 document.querySelectorAll("[data-go-tab]").forEach((button) => button.addEventListener("click", () => showTab(button.dataset.goTab)));
-document.querySelectorAll(".filter-chip").forEach((button) => button.addEventListener("click", () => {
+document.querySelectorAll("#position-filters .filter-chip").forEach((button) => button.addEventListener("click", () => {
   state.marketFilter = button.dataset.market;
-  document.querySelectorAll(".filter-chip").forEach((chip) => chip.classList.toggle("is-active", chip === button));
+  document.querySelectorAll("#position-filters .filter-chip").forEach((chip) => chip.classList.toggle("is-active", chip === button));
   renderPositions();
 }));
+
+document.querySelectorAll("#transaction-filters .filter-chip").forEach((button) => button.addEventListener("click", () => {
+  state.transactionType = button.dataset.transactionType;
+  document.querySelectorAll("#transaction-filters .filter-chip").forEach((chip) => chip.classList.toggle("is-active", chip === button));
+  renderActivity();
+}));
+
+byId("transaction-search").addEventListener("input", (event) => {
+  state.transactionQuery = event.target.value;
+  renderActivity();
+});
+
+byId("clear-transaction-search").addEventListener("click", () => {
+  state.transactionQuery = "";
+  byId("transaction-search").value = "";
+  byId("transaction-search").focus();
+  renderActivity();
+});
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-asset-ledger]");
+  if (!button) return;
+  state.transactionQuery = button.dataset.symbol || "";
+  state.transactionType = "all";
+  byId("transaction-search").value = state.transactionQuery;
+  document.querySelectorAll("#transaction-filters .filter-chip").forEach((chip) => chip.classList.toggle("is-active", chip.dataset.transactionType === "all"));
+  showTab("activity");
+  byId("transaction-search").focus({ preventScroll: true });
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
 
 refreshButton.addEventListener("click", loadDashboard);
 byId("retry-button").addEventListener("click", loadDashboard);
