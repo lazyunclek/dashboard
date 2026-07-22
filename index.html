@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07100b">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="個人投資組合唯讀行動儀表板">
+  <title>投資儀表板</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <main class="app-shell" id="app">
+    <section class="login-view" id="login-view" aria-labelledby="login-title">
+      <div class="login-brand">
+        <span class="brand-mark">QL</span>
+        <span>QUANT LAB</span>
+      </div>
+      <div class="login-card">
+        <p class="eyebrow">PRIVATE / READ ONLY</p>
+        <h1 id="login-title">投資儀表板</h1>
+        <p class="login-copy">登入後從 Supabase 讀取你的最新帳本。這個手機版只能查看，不提供新增、修改或刪除。</p>
+        <form id="login-form" autocomplete="on">
+          <label>
+            <span>Email</span>
+            <input id="email" name="email" type="email" autocomplete="username" required placeholder="you@example.com">
+          </label>
+          <label>
+            <span>密碼</span>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+          </label>
+          <label class="remember-row">
+            <input id="remember-device" type="checkbox" checked>
+            <span>記住這支裝置（不保存密碼）</span>
+          </label>
+          <button class="primary-button" id="login-button" type="submit">登入查看</button>
+          <p class="form-status" id="login-status" role="status"></p>
+        </form>
+      </div>
+      <p class="security-note">Supabase Auth + RLS · GitHub Pages 不保存投資快照</p>
+    </section>
+
+    <section class="dashboard-view" id="dashboard-view" hidden>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">INVESTMENTS / SUPABASE</p>
+          <h1>投資總覽</h1>
+        </div>
+        <div class="topbar-actions">
+          <button class="icon-button" id="privacy-toggle" type="button" aria-label="隱藏金額" title="隱藏金額">◉</button>
+          <button class="icon-button" id="refresh-button" type="button" aria-label="重新整理" title="重新整理">↻</button>
+        </div>
+      </header>
+
+      <section class="status-card" aria-label="資料狀態">
+        <div class="status-heading">
+          <span class="live-dot"></span>
+          <strong>Supabase 已連線</strong>
+        </div>
+        <div class="status-meta">
+          <span id="portfolio-name">—</span>
+          <span id="data-updated-at">讀取中</span>
+        </div>
+        <div class="status-actions">
+          <span id="user-email">—</span>
+          <button class="text-button" id="sign-out-button" type="button">登出</button>
+        </div>
+      </section>
+
+      <nav class="tabbar" aria-label="Dashboard sections">
+        <button class="tab is-active" data-tab="overview" type="button">總覽</button>
+        <button class="tab" data-tab="positions" type="button">持倉</button>
+        <button class="tab" data-tab="activity" type="button">帳本</button>
+      </nav>
+
+      <div class="loading-card" id="loading-card">
+        <span class="spinner"></span>
+        <span>正在讀取最新帳本…</span>
+      </div>
+
+      <div id="error-card" class="error-card" hidden>
+        <strong>資料讀取失敗</strong>
+        <p id="error-message"></p>
+        <button class="secondary-button" id="retry-button" type="button">再試一次</button>
+      </div>
+
+      <section class="tab-panel" data-panel="overview" id="overview-panel" hidden>
+        <div class="hero-metric">
+          <span>總資產</span>
+          <strong class="private-value" id="total-assets">—</strong>
+          <small id="total-assets-note">含房地產淨值</small>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric-card">
+            <span>金融資產</span>
+            <strong class="private-value" id="financial-assets">—</strong>
+            <small id="financial-cost-note">成本 —</small>
+          </article>
+          <article class="metric-card">
+            <span>未實現損益</span>
+            <strong class="private-value" id="unrealized-pnl">—</strong>
+            <small id="unrealized-pct">—</small>
+          </article>
+          <article class="metric-card">
+            <span>已實現損益</span>
+            <strong class="private-value" id="realized-pnl">—</strong>
+            <small>含已清倉標的</small>
+          </article>
+          <article class="metric-card">
+            <span>股息／收益</span>
+            <strong class="private-value" id="income-total">—</strong>
+            <small id="income-count">—</small>
+          </article>
+        </div>
+
+        <section class="content-card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">ALLOCATION</p>
+              <h2>資產全貌</h2>
+            </div>
+            <small>以目前 TWD 價值</small>
+          </div>
+          <div id="asset-groups" class="asset-groups"></div>
+        </section>
+
+        <section class="content-card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">TOP POSITIONS</p>
+              <h2>主要持倉</h2>
+            </div>
+            <button class="text-button" data-go-tab="positions" type="button">查看全部</button>
+          </div>
+          <div id="top-positions" class="position-list compact"></div>
+        </section>
+      </section>
+
+      <section class="tab-panel" data-panel="positions" id="positions-panel" hidden>
+        <div class="section-head sticky-head">
+          <div>
+            <p class="eyebrow">POSITIONS</p>
+            <h2>持倉</h2>
+          </div>
+          <span id="position-count" class="count-badge">0</span>
+        </div>
+        <div class="filter-row" id="position-filters">
+          <button class="filter-chip is-active" data-market="all" type="button">全部</button>
+          <button class="filter-chip" data-market="tw_equity" type="button">台股</button>
+          <button class="filter-chip" data-market="us_equity" type="button">美股</button>
+          <button class="filter-chip" data-market="crypto" type="button">加密</button>
+        </div>
+        <div id="positions-list" class="position-list"></div>
+      </section>
+
+      <section class="tab-panel" data-panel="activity" id="activity-panel" hidden>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">LEDGER</p>
+            <h2>最近交易</h2>
+          </div>
+          <span id="transaction-count" class="count-badge">0</span>
+        </div>
+        <div id="transaction-list" class="transaction-list"></div>
+
+        <div class="section-head income-head">
+          <div>
+            <p class="eyebrow">INCOME</p>
+            <h2>最近收益</h2>
+          </div>
+          <span id="income-event-count" class="count-badge">0</span>
+        </div>
+        <div id="income-list" class="transaction-list"></div>
+      </section>
+
+      <footer class="app-footer">
+        <span>唯讀行動版</span>
+        <span>資料由 Supabase RLS 保護</span>
+      </footer>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

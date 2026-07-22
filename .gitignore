@@ -1,0 +1,6 @@
+.DS_Store
+.qa/
+.env
+.env.*
+config.local.js
+node_modules/
