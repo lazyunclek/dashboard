@@ -113,6 +113,14 @@ async function fetchAll(path, pageSize = 1000) {
   throw new Error("資料超過行動版單次讀取上限");
 }
 
+async function fetchLatestMarketPrices(assets, portfolioId) {
+  const select = "select=id,portfolio_id,asset_id,instrument_key,quote_currency,price,price_at,fetched_at,source,status";
+  const filter = `portfolio_id=eq.${encodeURIComponent(portfolioId)}&status=eq.success`;
+  const requests = assets.map((asset) => rest(`investment_market_prices?${select}&${filter}&asset_id=eq.${encodeURIComponent(asset.id)}&order=fetched_at.desc&limit=1`));
+  requests.push(rest(`investment_market_prices?${select}&${filter}&instrument_key=eq.${encodeURIComponent("USD/TWD")}&order=fetched_at.desc&limit=1`));
+  return (await Promise.all(requests)).flat();
+}
+
 function num(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -438,14 +446,14 @@ async function loadDashboard() {
     const portfolioId = portfolios[0]?.id;
     if (!portfolioId) throw new Error("這個帳號沒有可用的投資組合");
     const filter = `portfolio_id=eq.${encodeURIComponent(portfolioId)}`;
-    const [assets, transactions, incomeEvents, marketPrices, components, gridRecords] = await Promise.all([
+    const [assets, transactions, incomeEvents, components, gridRecords] = await Promise.all([
       fetchAll(`investment_assets?select=id,portfolio_id,symbol,name,asset_class,market,quote_currency,quantity_unit,quantity_scale,price_scale,amount_scale,metadata&${filter}&order=symbol.asc`),
       fetchAll(`investment_transactions?select=id,portfolio_id,account_id,asset_id,transaction_type,trade_date,quantity,unit_price,gross_amount,fee_amount,tax_amount,net_cash_amount,settlement_currency,status,details,created_at,updated_at&status=neq.voided&${filter}&order=trade_date.desc,created_at.desc`),
       fetchAll(`investment_income_events?select=id,portfolio_id,account_id,asset_id,income_type,event_date,gross_amount,withholding_tax,fee_amount,net_amount,currency,status,details,created_at,updated_at&status=neq.voided&${filter}&order=event_date.desc,created_at.desc`),
-      rest(`investment_market_prices?select=id,portfolio_id,asset_id,instrument_key,quote_currency,price,price_at,fetched_at,source,status&status=eq.success&${filter}&order=fetched_at.desc&limit=1000`),
       fetchAll(`investment_portfolio_component_values?select=id,portfolio_id,component_key,component_type,asset_class,market,symbol,name,quantity,quantity_unit,native_currency,latest_price,cost_twd,gross_value_twd,liability_twd,net_value_twd,realized_pnl_twd,unrealized_pnl_twd,income_twd,included_in_total,included_in_financial,source_system,source_updated_at,data_status,metadata&${filter}&order=component_key.asc`),
       fetchAll(`investment_grid_records?select=id,portfolio_id,record_state,symbol,status,investment_usdt,realized_pnl,source_updated_at&${filter}&order=source_updated_at.desc`)
     ]);
+    const marketPrices = await fetchLatestMarketPrices(assets, portfolioId);
     state.data = buildDashboard({ portfolios, assets, transactions, incomeEvents, marketPrices, components, gridRecords });
     renderDashboard();
   } catch (error) {

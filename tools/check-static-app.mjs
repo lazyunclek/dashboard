@@ -27,6 +27,8 @@ for (const token of ["position-return", "pnlPercent", "unrealizedPnlPct.toFixed(
 for (const token of ["canonicalPositions", "component.latest_price", "component.net_value_twd ?? component.gross_value_twd"]) {
   if (!app.includes(token)) throw new Error(`Missing position snapshot fallback: ${token}`);
 }
+if (!app.includes("fetchLatestMarketPrices") || !app.includes("asset_id=eq.${encodeURIComponent(asset.id)}")) throw new Error("Latest per-asset market price query missing");
+if (app.includes("order=fetched_at.desc&limit=1000")) throw new Error("Global market-price truncation query must not be used");
 for (const query of ["investment_portfolios", "investment_assets", "investment_transactions", "investment_income_events", "investment_market_prices", "investment_portfolio_component_values", "investment_grid_records"]) {
   if (!app.includes(query)) throw new Error(`Missing read source: ${query}`);
 }
