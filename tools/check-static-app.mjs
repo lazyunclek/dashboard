@@ -18,7 +18,7 @@ const [html, css, app, config, workflow] = await Promise.all([
 for (const token of ["login-view", "dashboard-view", "positions-list", "transaction-search", "transaction-filters", "transaction-list"]) {
   if (!html.includes(`id="${token}"`)) throw new Error(`Missing HTML target: ${token}`);
 }
-for (const token of ["data-asset-ledger", "transactionQuery", "transactionType"]) {
+for (const token of ["data-asset-ledger", "data-transaction-type", "transactionQuery", "transactionType", "renderActivity();\n  showTab(\"activity\")"]) {
   if (!app.includes(token)) throw new Error(`Missing ledger filter behavior: ${token}`);
 }
 for (const token of ["position-return", "pnlPercent", "unrealizedPnlPct.toFixed(2)"]) {

@@ -503,6 +503,14 @@ function positionCard(position) {
   const pnlTone = !hasPnl ? "" : pnl >= 0 ? "is-positive" : "is-negative";
   const realizedTotal = num(position.realizedPnlTwd) + num(position.incomeTwd);
   const realizedTone = realizedTotal > 0 ? "is-positive" : realizedTotal < 0 ? "is-negative" : "";
+  const ledgerTransactions = state.data.transactions.filter((row) => row.asset_id === position.id && row.details?.event_role !== "asset_fee");
+  const buyCount = ledgerTransactions.filter((row) => row.transaction_type === "buy").length;
+  const sellCount = ledgerTransactions.filter((row) => row.transaction_type === "sell").length;
+  const ledgerActions = [
+    { type: "all", label: `全部 ${ledgerTransactions.length} 筆` },
+    { type: "buy", label: `買入 ${buyCount} 筆`, hidden: buyCount === 0 },
+    { type: "sell", label: `賣出 ${sellCount} 筆`, hidden: sellCount === 0 }
+  ].filter((action) => !action.hidden).map((action) => `<button class="position-ledger-button" type="button" data-asset-ledger="${escapeHtml(position.id)}" data-symbol="${escapeHtml(position.symbol)}" data-transaction-type="${action.type}">${action.label}</button>`).join("");
   details.innerHTML = `
     <summary>
       <span class="position-identity">
@@ -527,7 +535,9 @@ function positionCard(position) {
       <span class="position-detail"><span>主題</span><strong>${escapeHtml(position.subTheme)}</strong></span>
       <span class="position-detail"><span>行情時間</span><strong>${dateTime(position.marketPriceAt)}</strong></span>
     </div>
-    <button class="position-ledger-button" type="button" data-asset-ledger="${escapeHtml(position.id)}" data-symbol="${escapeHtml(position.symbol)}">查看 ${escapeHtml(position.displaySymbol)} 成交紀錄 →</button>`;
+    <div class="position-ledger-actions" aria-label="${escapeHtml(position.displaySymbol)} 成交紀錄篩選">
+      ${ledgerActions}
+    </div>`;
   return details;
 }
 
@@ -708,9 +718,10 @@ document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-asset-ledger]");
   if (!button) return;
   state.transactionQuery = button.dataset.symbol || "";
-  state.transactionType = "all";
+  state.transactionType = button.dataset.transactionType || "all";
   byId("transaction-search").value = state.transactionQuery;
-  document.querySelectorAll("#transaction-filters .filter-chip").forEach((chip) => chip.classList.toggle("is-active", chip.dataset.transactionType === "all"));
+  document.querySelectorAll("#transaction-filters .filter-chip").forEach((chip) => chip.classList.toggle("is-active", chip.dataset.transactionType === state.transactionType));
+  renderActivity();
   showTab("activity");
   byId("transaction-search").focus({ preventScroll: true });
   window.scrollTo({ top: 0, behavior: "smooth" });
