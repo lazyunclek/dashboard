@@ -205,10 +205,19 @@ function movingLedger(rows) {
     boughtCost,
     soldQuantity,
     soldProceeds,
+    buyAveragePrice: weightedTradePrice(rows, "buy"),
+    sellAveragePrice: weightedTradePrice(rows, "sell"),
     fees,
     taxes,
     realizedPnl: isClosed ? soldProceeds - boughtCost : Math.max(0, soldProceeds - boughtCost)
   };
+}
+
+function weightedTradePrice(rows, transactionType) {
+  const trades = rows.filter((row) => row.transaction_type === transactionType);
+  const totalQuantity = trades.reduce((sum, row) => sum + num(row.quantity), 0);
+  const totalGross = trades.reduce((sum, row) => sum + num(row.gross_amount), 0);
+  return totalQuantity > 0 ? totalGross / totalQuantity : null;
 }
 
 function buildDashboard(raw) {
@@ -279,6 +288,9 @@ function buildDashboard(raw) {
       quantity: ledger.quantity,
       costNative: ledger.remainingCost,
       costTwd,
+      averageCost: ledger.quantity > 0 ? ledger.remainingCost / ledger.quantity : null,
+      buyAveragePrice: ledger.buyAveragePrice,
+      sellAveragePrice: ledger.sellAveragePrice,
       marketPrice: nativePrice,
       marketPriceCurrency: price?.quote_currency || asset.quote_currency,
       marketPriceAt: price?.price_at || price?.fetched_at || null,
@@ -336,6 +348,9 @@ function buildDashboard(raw) {
       quantity: num(component.quantity),
       costNative: null,
       costTwd,
+      averageCost: null,
+      buyAveragePrice: null,
+      sellAveragePrice: null,
       marketPrice: price?.price === null || price?.price === undefined ? num(component.latest_price) || null : num(price.price),
       marketPriceCurrency: price?.quote_currency || component.native_currency,
       marketPriceAt: price?.price_at || price?.fetched_at || component.source_updated_at,
@@ -499,8 +514,11 @@ function positionCard(position) {
     </summary>
     <div class="position-details">
       <span class="position-detail"><span>持有數量</span><strong class="private-number">${quantity(position.quantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</strong></span>
+      <span class="position-detail"><span>持倉均價</span><strong class="private-number">${position.averageCost === null ? "—" : money(position.averageCost, position.quoteCurrency)}</strong></span>
       <span class="position-detail"><span>最新價格</span><strong class="private-number">${position.marketPrice === null ? "—" : money(position.marketPrice, position.marketPriceCurrency)}</strong></span>
+      <span class="position-detail"><span>累計買入均價</span><strong class="private-number">${position.buyAveragePrice === null ? "—" : money(position.buyAveragePrice, position.quoteCurrency)}</strong></span>
       <span class="position-detail"><span>剩餘成本</span><strong class="private-number">${money(position.costTwd)}</strong></span>
+      <span class="position-detail"><span>累計賣出均價</span><strong class="private-number">${position.sellAveragePrice === null ? "—" : money(position.sellAveragePrice, position.quoteCurrency)}</strong></span>
       <span class="position-detail"><span>未實現報酬</span><strong class="private-number ${pnlTone}">${position.unrealizedPnlPct === null ? "零成本／待補" : pnlPercent}</strong></span>
       <span class="position-detail"><span>主題</span><strong>${escapeHtml(position.subTheme)}</strong></span>
       <span class="position-detail"><span>行情時間</span><strong>${dateTime(position.marketPriceAt)}</strong></span>
