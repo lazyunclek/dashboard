@@ -501,6 +501,8 @@ function positionCard(position) {
     ? "—"
     : `${position.unrealizedPnlPct >= 0 ? "+" : ""}${position.unrealizedPnlPct.toFixed(2)}%`;
   const pnlTone = !hasPnl ? "" : pnl >= 0 ? "is-positive" : "is-negative";
+  const realizedTotal = num(position.realizedPnlTwd) + num(position.incomeTwd);
+  const realizedTone = realizedTotal > 0 ? "is-positive" : realizedTotal < 0 ? "is-negative" : "";
   details.innerHTML = `
     <summary>
       <span class="position-identity">
@@ -519,7 +521,9 @@ function positionCard(position) {
       <span class="position-detail"><span>累計買入均價</span><strong class="private-number">${position.buyAveragePrice === null ? "—" : money(position.buyAveragePrice, position.quoteCurrency)}</strong></span>
       <span class="position-detail"><span>剩餘成本</span><strong class="private-number">${money(position.costTwd)}</strong></span>
       <span class="position-detail"><span>累計賣出均價</span><strong class="private-number">${position.sellAveragePrice === null ? "—" : money(position.sellAveragePrice, position.quoteCurrency)}</strong></span>
+      <span class="position-detail"><span>未實現損益</span><strong class="private-number ${pnlTone}">${hasPnl ? money(pnl, "TWD", true) : "—"}</strong></span>
       <span class="position-detail"><span>未實現報酬</span><strong class="private-number ${pnlTone}">${position.unrealizedPnlPct === null ? "零成本／待補" : pnlPercent}</strong></span>
+      <span class="position-detail"><span>已實現合計</span><strong class="private-number ${realizedTone}">${money(realizedTotal, "TWD", true)}</strong></span>
       <span class="position-detail"><span>主題</span><strong>${escapeHtml(position.subTheme)}</strong></span>
       <span class="position-detail"><span>行情時間</span><strong>${dateTime(position.marketPriceAt)}</strong></span>
     </div>
