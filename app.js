@@ -377,6 +377,10 @@ function buildDashboard(raw) {
     return sum + num(row.quantity) * currentFx;
   }, 0);
   const cashCostTwd = cashComponents.reduce((sum, row) => sum + (row.native_currency === "TWD" ? num(row.quantity ?? row.cost_twd) : num(row.quantity) * pooledCostFx), 0);
+  const cashCurrencies = cashComponents
+    .filter((row) => Math.abs(num(row.quantity ?? row.net_value_twd ?? row.gross_value_twd)) > 1e-10)
+    .map((row) => String(row.native_currency || "").toUpperCase())
+    .filter(Boolean);
 
   const propertyComponents = components.filter((row) => row.component_type === "property" && row.included_in_total);
   const propertyValueTwd = propertyComponents.reduce((sum, row) => sum + num(row.net_value_twd), 0);
@@ -384,6 +388,7 @@ function buildDashboard(raw) {
   const runningGrids = gridRecords.filter((row) => row.record_state === "running");
   const closedGrids = gridRecords.filter((row) => row.record_state === "closed");
   const gridInvestmentUsd = runningGrids.reduce((sum, row) => sum + num(row.investment_usdt), 0);
+  const runningGridPnlUsd = runningGrids.reduce((sum, row) => sum + num(row.realized_pnl), 0);
   const gridPnlUsd = [...runningGrids, ...closedGrids].reduce((sum, row) => sum + num(row.realized_pnl), 0);
   const gridValueTwd = (gridInvestmentUsd + gridPnlUsd) * currentFx;
   const gridCostTwd = gridInvestmentUsd * pooledCostFx;
@@ -434,6 +439,10 @@ function buildDashboard(raw) {
     incomeEvents: incomeEvents.sort((a, b) => String(b.event_date).localeCompare(String(a.event_date))),
     assetsById,
     groups,
+    cashValueTwd,
+    cashCurrencies,
+    runningGridCount: runningGrids.length,
+    runningGridPnlUsd,
     currentFx,
     pooledCostFx,
     financialAssetsTwd,
@@ -620,6 +629,11 @@ function renderOverview() {
   byId("income-total").textContent = money(data.incomeTwd, "TWD", true);
   setTone(byId("income-total"), data.incomeTwd);
   byId("income-count").textContent = `${data.incomeEvents.length} 筆收益事件`;
+  byId("current-cash").textContent = money(data.cashValueTwd);
+  byId("current-cash-note").textContent = data.cashCurrencies.length ? data.cashCurrencies.join(" · ") : "尚未填寫目前現金";
+  byId("running-grid-count").textContent = data.runningGridCount ? `${data.runningGridCount} 組` : "目前沒有";
+  byId("running-grid-pnl").textContent = data.runningGridCount ? `總損益 ${money(data.runningGridPnlUsd, "USDT", true)}` : "—";
+  setTone(byId("running-grid-pnl"), data.runningGridPnlUsd);
 
   const groups = byId("asset-groups");
   groups.replaceChildren();
@@ -636,10 +650,6 @@ function renderOverview() {
     groups.append(row);
   }
 
-  const top = byId("top-positions");
-  top.replaceChildren();
-  data.positions.slice(0, 6).forEach((row) => top.append(positionCard(row)));
-  if (!data.positions.length) top.innerHTML = '<div class="empty-state">目前沒有持倉</div>';
 }
 
 function renderDashboard() {

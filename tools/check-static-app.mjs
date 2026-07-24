@@ -15,9 +15,10 @@ const [html, css, app, config, workflow] = await Promise.all([
   fs.readFile(path.join(root, ".github/workflows/pages.yml"), "utf8")
 ]);
 
-for (const token of ["login-view", "dashboard-view", "positions-list", "transaction-search", "transaction-filters", "transaction-list"]) {
+for (const token of ["login-view", "dashboard-view", "positions-list", "transaction-search", "transaction-filters", "transaction-list", "current-cash", "running-grid-count"]) {
   if (!html.includes(`id="${token}"`)) throw new Error(`Missing HTML target: ${token}`);
 }
+if (html.includes('id="top-positions"') || html.includes("主要持倉")) throw new Error("Overview must not duplicate the positions list");
 for (const token of ["data-asset-ledger", "data-transaction-type", "transactionQuery", "transactionType", "renderActivity();\n  showTab(\"activity\")"]) {
   if (!app.includes(token)) throw new Error(`Missing ledger filter behavior: ${token}`);
 }
@@ -29,6 +30,9 @@ for (const token of ["持倉均價", "累計買入均價", "累計賣出均價",
 }
 for (const token of ["未實現損益", "已實現合計", "const realizedTotal"]) {
   if (!app.includes(token)) throw new Error(`Missing position profit detail: ${token}`);
+}
+for (const token of ["cashValueTwd", "runningGridCount", "runningGridPnlUsd"]) {
+  if (!app.includes(token)) throw new Error(`Missing overview capital or strategy signal: ${token}`);
 }
 for (const token of ["canonicalPositions", "component.latest_price", "component.net_value_twd ?? component.gross_value_twd"]) {
   if (!app.includes(token)) throw new Error(`Missing position snapshot fallback: ${token}`);

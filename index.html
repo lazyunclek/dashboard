@@ -130,15 +130,25 @@
           <div id="asset-groups" class="asset-groups"></div>
         </section>
 
-        <section class="content-card">
+        <section class="content-card overview-operations" aria-label="資金與策略">
           <div class="section-head">
             <div>
-              <p class="eyebrow">TOP POSITIONS</p>
-              <h2>主要持倉</h2>
+              <p class="eyebrow">CAPITAL &amp; STRATEGY</p>
+              <h2>資金與策略</h2>
             </div>
-            <button class="text-button" data-go-tab="positions" type="button">查看全部</button>
           </div>
-          <div id="top-positions" class="position-list compact"></div>
+          <div class="overview-operations-grid">
+            <article class="overview-operation">
+              <span>目前現金</span>
+              <strong class="private-value" id="current-cash">—</strong>
+              <small id="current-cash-note">—</small>
+            </article>
+            <article class="overview-operation">
+              <span>運行中網格</span>
+              <strong id="running-grid-count">—</strong>
+              <small class="private-number" id="running-grid-pnl">—</small>
+            </article>
+          </div>
         </section>
       </section>
 
