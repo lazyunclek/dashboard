@@ -757,7 +757,6 @@ document.addEventListener("click", (event) => {
   document.querySelectorAll("#transaction-filters .filter-chip").forEach((chip) => chip.classList.toggle("is-active", chip.dataset.transactionType === state.transactionType));
   renderActivity();
   showTab("activity");
-  byId("transaction-search").focus({ preventScroll: true });
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 
