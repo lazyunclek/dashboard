@@ -28,6 +28,9 @@ for (const token of ["position-return", "pnlPercent", "unrealizedPnlPct.toFixed(
 for (const token of ["持倉均價", "累計買入均價", "累計賣出均價", "function weightedTradePrice", "buyAveragePrice", "sellAveragePrice"]) {
   if (!app.includes(token)) throw new Error(`Missing position average-price detail: ${token}`);
 }
+for (const token of ["function transactionCashflow", "function transactionCashflowLabel", "成交單價", "實付", "實收", "transaction-cashflow"]) {
+  if (!app.includes(token)) throw new Error(`Missing per-transaction cashflow detail: ${token}`);
+}
 for (const token of ["未實現損益", "已實現合計", "const realizedTotal"]) {
   if (!app.includes(token)) throw new Error(`Missing position profit detail: ${token}`);
 }

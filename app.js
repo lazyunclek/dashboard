@@ -139,6 +139,23 @@ function quantity(value, scale = 4) {
   return new Intl.NumberFormat("zh-TW", { maximumFractionDigits: Math.min(8, Math.max(0, num(scale))) }).format(num(value));
 }
 
+function transactionCashflow(row) {
+  if (row.net_cash_amount !== null && row.net_cash_amount !== undefined) return num(row.net_cash_amount);
+  const gross = Math.abs(num(row.gross_amount));
+  const charges = num(row.fee_amount) + num(row.tax_amount);
+  if (row.transaction_type === "buy") return -(gross + charges);
+  if (row.transaction_type === "sell") return gross - charges;
+  return null;
+}
+
+function transactionCashflowLabel(row) {
+  const cashflow = transactionCashflow(row);
+  if (cashflow === null) return "現金流待補";
+  if (row.transaction_type === "buy") return `實付 ${money(Math.abs(cashflow), row.settlement_currency)}`;
+  if (row.transaction_type === "sell") return `實收 ${money(cashflow, row.settlement_currency)}`;
+  return `淨現金流 ${money(cashflow, row.settlement_currency, true)}`;
+}
+
 function shortDate(value) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("zh-TW", { month: "2-digit", day: "2-digit" }).format(new Date(`${String(value).slice(0, 10)}T00:00:00`));
@@ -591,7 +608,7 @@ function renderActivity() {
     item.innerHTML = `
       <span class="transaction-type ${isSell ? "is-sell" : ""}">${escapeHtml(label)}</span>
       <span class="transaction-copy"><strong>${escapeHtml(asset.symbol || "—")} · ${escapeHtml(asset.name || "未命名標的")}</strong><small>${shortDate(row.trade_date)} · ${escapeHtml(row.settlement_currency)}</small><small class="transaction-costs private-number">手續費 ${money(row.fee_amount || 0, row.settlement_currency)} · 稅 ${money(row.tax_amount || 0, row.settlement_currency)}</small></span>
-      <span class="transaction-amount"><strong class="private-number">${quantity(row.quantity, asset.quantity_scale)} ${escapeHtml(asset.quantity_unit || "")}</strong><small class="private-number">${row.unit_price === null ? "無成交價" : money(row.unit_price, row.settlement_currency)}</small></span>`;
+      <span class="transaction-amount"><strong class="private-number">${quantity(row.quantity, asset.quantity_scale)} ${escapeHtml(asset.quantity_unit || "")}</strong><small class="private-number">成交單價 ${row.unit_price === null ? "無" : money(row.unit_price, row.settlement_currency)}</small><small class="transaction-cashflow private-number">${transactionCashflowLabel(row)}</small></span>`;
     transactionList.append(item);
   }
   if (!transactions.length) transactionList.innerHTML = '<div class="empty-state">目前沒有交易紀錄</div>';
