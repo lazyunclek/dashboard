@@ -295,7 +295,9 @@ input::placeholder { color: #53645a; }
 .transaction-copy .transaction-costs { color: #718078; }
 .transaction-amount { text-align: right; }
 .transaction-amount strong { display: block; font: 650 11px/1.25 var(--mono); }
-.transaction-amount small { display: block; margin-top: 5px; color: var(--muted); font: 9px/1 var(--mono); }
+.transaction-amount small { display: block; margin-top: 5px; color: var(--muted); font: 9px/1.25 var(--mono); }
+.transaction-amount .transaction-gross { color: var(--text); }
+.transaction-amount .transaction-charge-total { color: #cbbd85; }
 .transaction-amount .transaction-cashflow { margin-top: 6px; color: var(--text); font-weight: 700; }
 .income-head { margin-top: 12px; }
 .app-footer { display: flex; justify-content: space-between; padding: 18px 2px 6px; color: #526259; font: 9px/1.4 var(--mono); }

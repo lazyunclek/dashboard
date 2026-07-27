@@ -142,10 +142,14 @@ function quantity(value, scale = 4) {
 function transactionCashflow(row) {
   if (row.net_cash_amount !== null && row.net_cash_amount !== undefined) return num(row.net_cash_amount);
   const gross = Math.abs(num(row.gross_amount));
-  const charges = num(row.fee_amount) + num(row.tax_amount);
+  const charges = transactionCharges(row);
   if (row.transaction_type === "buy") return -(gross + charges);
   if (row.transaction_type === "sell") return gross - charges;
   return null;
+}
+
+function transactionCharges(row) {
+  return num(row.fee_amount) + num(row.tax_amount);
 }
 
 function transactionCashflowLabel(row) {
@@ -605,10 +609,13 @@ function renderActivity() {
     item.className = "transaction-row";
     const isSell = row.transaction_type === "sell";
     const label = ({ buy: "買入", sell: "賣出", transfer_in: "轉入", transfer_out: "轉出", adjustment: "調整", split: "分割" })[row.transaction_type] || row.transaction_type;
+    const grossAmount = Math.abs(num(row.gross_amount));
+    const charges = transactionCharges(row);
+    const grossLabel = isSell ? "賣出金額" : row.transaction_type === "buy" ? "買入金額" : "交易金額";
     item.innerHTML = `
       <span class="transaction-type ${isSell ? "is-sell" : ""}">${escapeHtml(label)}</span>
       <span class="transaction-copy"><strong>${escapeHtml(asset.symbol || "—")} · ${escapeHtml(asset.name || "未命名標的")}</strong><small>${shortDate(row.trade_date)} · ${escapeHtml(row.settlement_currency)}</small><small class="transaction-costs private-number">手續費 ${money(row.fee_amount || 0, row.settlement_currency)} · 稅 ${money(row.tax_amount || 0, row.settlement_currency)}</small></span>
-      <span class="transaction-amount"><strong class="private-number">${quantity(row.quantity, asset.quantity_scale)} ${escapeHtml(asset.quantity_unit || "")}</strong><small class="private-number">成交單價 ${row.unit_price === null ? "無" : money(row.unit_price, row.settlement_currency)}</small><small class="transaction-cashflow private-number">${transactionCashflowLabel(row)}</small></span>`;
+      <span class="transaction-amount"><strong class="private-number">${quantity(row.quantity, asset.quantity_scale)} ${escapeHtml(asset.quantity_unit || "")}</strong><small class="private-number">每股 ${row.unit_price === null ? "無" : money(row.unit_price, row.settlement_currency)}</small><small class="transaction-gross private-number">${grossLabel} ${money(grossAmount, row.settlement_currency)}</small><small class="transaction-charge-total private-number">費用合計 ${money(charges, row.settlement_currency)}</small><small class="transaction-cashflow private-number">${transactionCashflowLabel(row)}</small></span>`;
     transactionList.append(item);
   }
   if (!transactions.length) transactionList.innerHTML = '<div class="empty-state">目前沒有交易紀錄</div>';
