@@ -19,7 +19,7 @@ for (const token of ["login-view", "dashboard-view", "positions-list", "transact
   if (!html.includes(`id="${token}"`)) throw new Error(`Missing HTML target: ${token}`);
 }
 if (html.includes('id="top-positions"') || html.includes("主要持倉")) throw new Error("Overview must not duplicate the positions list");
-for (const token of ["data-asset-ledger", "data-transaction-type", "transactionQuery", "transactionType", "renderActivity();\n  showTab(\"activity\")"]) {
+for (const token of ["data-asset-ledger", "data-transaction-type", "transactionAssetId", "row.asset_id !== state.transactionAssetId", "transactionQuery", "transactionType", "renderActivity();\n  showTab(\"activity\")"]) {
   if (!app.includes(token)) throw new Error(`Missing ledger filter behavior: ${token}`);
 }
 for (const token of ["position-return", "pnlPercent", "unrealizedPnlPct.toFixed(2)"]) {

@@ -20,6 +20,7 @@ const state = {
   data: null,
   activeTab: "overview",
   marketFilter: "all",
+  transactionAssetId: "",
   transactionQuery: "",
   transactionType: "all",
   numbersHidden: window.localStorage.getItem(storageKeys.privacy) === "true",
@@ -591,13 +592,16 @@ function renderActivity() {
   const query = state.transactionQuery.trim().toLocaleLowerCase("zh-Hant");
   const transactions = state.data.transactions.filter((row) => {
     if (row.details?.event_role === "asset_fee") return false;
+    if (state.transactionAssetId && row.asset_id !== state.transactionAssetId) return false;
     if (state.transactionType !== "all" && row.transaction_type !== state.transactionType) return false;
     if (!query) return true;
     const asset = state.data.assetsById.get(row.asset_id) || {};
     return [asset.symbol, asset.name].some((value) => String(value || "").toLocaleLowerCase("zh-Hant").includes(query));
   });
   byId("transaction-count").textContent = transactions.length;
-  byId("transaction-filter-note").textContent = query
+  byId("transaction-filter-note").textContent = state.transactionAssetId
+    ? `找到 ${transactions.length} 筆 ${state.data.assetsById.get(state.transactionAssetId)?.symbol || "該標的"} 的成交紀錄`
+    : query
     ? `找到 ${transactions.length} 筆符合「${state.transactionQuery.trim()}」的成交紀錄`
     : `共 ${transactions.length} 筆成交紀錄`;
   byId("clear-transaction-search").hidden = !state.transactionQuery;
@@ -737,11 +741,13 @@ document.querySelectorAll("#transaction-filters .filter-chip").forEach((button) 
 }));
 
 byId("transaction-search").addEventListener("input", (event) => {
+  state.transactionAssetId = "";
   state.transactionQuery = event.target.value;
   renderActivity();
 });
 
 byId("clear-transaction-search").addEventListener("click", () => {
+  state.transactionAssetId = "";
   state.transactionQuery = "";
   byId("transaction-search").value = "";
   byId("transaction-search").focus();
@@ -751,6 +757,7 @@ byId("clear-transaction-search").addEventListener("click", () => {
 document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-asset-ledger]");
   if (!button) return;
+  state.transactionAssetId = button.dataset.assetLedger || "";
   state.transactionQuery = button.dataset.symbol || "";
   state.transactionType = button.dataset.transactionType || "all";
   byId("transaction-search").value = state.transactionQuery;
