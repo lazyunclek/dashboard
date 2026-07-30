@@ -136,6 +136,16 @@ function money(value, currency = "TWD", signed = false) {
   return `${prefix}${currency === "TWD" ? "NT$" : currency + " "}${formatted}`;
 }
 
+function marketPrice(position) {
+  const value = position.marketPrice;
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
+  const amount = Number(value);
+  const isTwoDigitTwEquity = position.assetClass === "tw_equity" && amount >= 10 && amount < 100;
+  const digits = isTwoDigitTwEquity ? 2 : 0;
+  const formatted = new Intl.NumberFormat("zh-TW", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(amount);
+  return `${position.marketPriceCurrency === "TWD" ? "NT$" : `${position.marketPriceCurrency} `}${formatted}`;
+}
+
 function quantity(value, scale = 4) {
   return new Intl.NumberFormat("zh-TW", { maximumFractionDigits: Math.min(8, Math.max(0, num(scale))) }).format(num(value));
 }
@@ -556,7 +566,7 @@ function positionCard(position) {
     <div class="position-details">
       <span class="position-detail"><span>持有數量</span><strong class="private-number">${quantity(position.quantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</strong></span>
       <span class="position-detail"><span>持倉均價</span><strong class="private-number">${position.averageCost === null ? "—" : money(position.averageCost, position.quoteCurrency)}</strong></span>
-      <span class="position-detail"><span>最新價格</span><strong class="private-number">${position.marketPrice === null ? "—" : money(position.marketPrice, position.marketPriceCurrency)}</strong></span>
+      <span class="position-detail"><span>最新價格</span><strong class="private-number">${marketPrice(position)}</strong></span>
       <span class="position-detail"><span>累計買入均價</span><strong class="private-number">${position.buyAveragePrice === null ? "—" : money(position.buyAveragePrice, position.quoteCurrency)}</strong></span>
       <span class="position-detail"><span>剩餘成本</span><strong class="private-number">${money(position.costTwd)}</strong></span>
       <span class="position-detail"><span>累計賣出均價</span><strong class="private-number">${position.sellAveragePrice === null ? "—" : money(position.sellAveragePrice, position.quoteCurrency)}</strong></span>
