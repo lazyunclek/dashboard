@@ -136,14 +136,13 @@ function money(value, currency = "TWD", signed = false) {
   return `${prefix}${currency === "TWD" ? "NT$" : currency + " "}${formatted}`;
 }
 
-function marketPrice(position) {
-  const value = position.marketPrice;
+function perSharePrice(value, currency, assetClass) {
   if (value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
   const amount = Number(value);
-  const isTwoDigitTwEquity = position.assetClass === "tw_equity" && amount >= 10 && amount < 100;
-  const digits = isTwoDigitTwEquity ? 2 : 0;
+  const isTwEquity = assetClass === "tw_equity";
+  const digits = isTwEquity ? (amount >= 10 && amount < 100 ? 2 : 0) : (currency === "TWD" ? 0 : 2);
   const formatted = new Intl.NumberFormat("zh-TW", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(amount);
-  return `${position.marketPriceCurrency === "TWD" ? "NT$" : `${position.marketPriceCurrency} `}${formatted}`;
+  return `${currency === "TWD" ? "NT$" : `${currency} `}${formatted}`;
 }
 
 function quantity(value, scale = 4) {
@@ -565,11 +564,11 @@ function positionCard(position) {
     </summary>
     <div class="position-details">
       <span class="position-detail"><span>持有數量</span><strong class="private-number">${quantity(position.quantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</strong></span>
-      <span class="position-detail"><span>持倉均價</span><strong class="private-number">${position.averageCost === null ? "—" : money(position.averageCost, position.quoteCurrency)}</strong></span>
-      <span class="position-detail"><span>最新價格</span><strong class="private-number">${marketPrice(position)}</strong></span>
-      <span class="position-detail"><span>累計買入均價</span><strong class="private-number">${position.buyAveragePrice === null ? "—" : money(position.buyAveragePrice, position.quoteCurrency)}</strong></span>
+      <span class="position-detail"><span>持倉均價</span><strong class="private-number">${perSharePrice(position.averageCost, position.quoteCurrency, position.assetClass)}</strong></span>
+      <span class="position-detail"><span>最新價格</span><strong class="private-number">${perSharePrice(position.marketPrice, position.marketPriceCurrency, position.assetClass)}</strong></span>
+      <span class="position-detail"><span>累計買入均價</span><strong class="private-number">${perSharePrice(position.buyAveragePrice, position.quoteCurrency, position.assetClass)}</strong></span>
       <span class="position-detail"><span>剩餘成本</span><strong class="private-number">${money(position.costTwd)}</strong></span>
-      <span class="position-detail"><span>累計賣出均價</span><strong class="private-number">${position.sellAveragePrice === null ? "—" : money(position.sellAveragePrice, position.quoteCurrency)}</strong></span>
+      <span class="position-detail"><span>累計賣出均價</span><strong class="private-number">${perSharePrice(position.sellAveragePrice, position.quoteCurrency, position.assetClass)}</strong></span>
       <span class="position-detail"><span>未實現損益</span><strong class="private-number ${pnlTone}">${hasPnl ? money(pnl, "TWD", true) : "—"}</strong></span>
       <span class="position-detail"><span>未實現報酬</span><strong class="private-number ${pnlTone}">${position.unrealizedPnlPct === null ? "零成本／待補" : pnlPercent}</strong></span>
       <span class="position-detail"><span>已實現合計</span><strong class="private-number ${realizedTone}">${money(realizedTotal, "TWD", true)}</strong></span>
@@ -629,7 +628,7 @@ function renderActivity() {
     item.innerHTML = `
       <span class="transaction-type ${isSell ? "is-sell" : ""}">${escapeHtml(label)}</span>
       <span class="transaction-copy"><strong>${escapeHtml(asset.symbol || "—")} · ${escapeHtml(asset.name || "未命名標的")}</strong><small>${shortDate(row.trade_date)} · ${escapeHtml(row.settlement_currency)}</small><small class="transaction-costs private-number">手續費 ${money(row.fee_amount || 0, row.settlement_currency)} · 稅 ${money(row.tax_amount || 0, row.settlement_currency)}</small></span>
-      <span class="transaction-amount"><strong class="private-number">${quantity(row.quantity, asset.quantity_scale)} ${escapeHtml(asset.quantity_unit || "")}</strong><small class="private-number">每股 ${row.unit_price === null ? "無" : money(row.unit_price, row.settlement_currency)}</small><small class="transaction-gross private-number">${grossLabel} ${money(grossAmount, row.settlement_currency)}</small><small class="transaction-charge-total private-number">費用合計 ${money(charges, row.settlement_currency)}</small><small class="transaction-cashflow private-number">${transactionCashflowLabel(row)}</small></span>`;
+      <span class="transaction-amount"><strong class="private-number">${quantity(row.quantity, asset.quantity_scale)} ${escapeHtml(asset.quantity_unit || "")}</strong><small class="private-number">每股 ${row.unit_price === null ? "無" : perSharePrice(row.unit_price, row.settlement_currency, asset.asset_class)}</small><small class="transaction-gross private-number">${grossLabel} ${money(grossAmount, row.settlement_currency)}</small><small class="transaction-charge-total private-number">費用合計 ${money(charges, row.settlement_currency)}</small><small class="transaction-cashflow private-number">${transactionCashflowLabel(row)}</small></span>`;
     transactionList.append(item);
   }
   if (!transactions.length) transactionList.innerHTML = '<div class="empty-state">目前沒有交易紀錄</div>';

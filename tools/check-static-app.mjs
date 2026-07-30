@@ -40,8 +40,8 @@ for (const token of ["cashValueTwd", "runningGridCount", "runningGridPnlUsd"]) {
 for (const token of ["canonicalPositions", "component.latest_price", "component.net_value_twd ?? component.gross_value_twd"]) {
   if (!app.includes(token)) throw new Error(`Missing position snapshot fallback: ${token}`);
 }
-for (const token of ["function marketPrice", 'position.assetClass === "tw_equity"', "amount >= 10 && amount < 100"]) {
-  if (!app.includes(token)) throw new Error(`Missing two-digit Taiwan equity price formatting: ${token}`);
+for (const token of ["function perSharePrice", 'assetClass === "tw_equity"', "amount >= 10 && amount < 100", "perSharePrice(row.unit_price", "perSharePrice(position.averageCost"]) {
+  if (!app.includes(token)) throw new Error(`Missing two-digit Taiwan equity per-share price formatting: ${token}`);
 }
 if (!app.includes("function spotPositionKey") || !app.includes("replace(/-(?:USD|USDT|USDC)$/")) throw new Error("Crypto spot alias deduplication missing");
 if (!app.includes("fetchLatestMarketPrices") || !app.includes("asset_id=eq.${encodeURIComponent(asset.id)}")) throw new Error("Latest per-asset market price query missing");
