@@ -180,6 +180,25 @@ function dateTime(value) {
   return new Intl.DateTimeFormat("zh-TW", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(value));
 }
 
+function quoteFreshness(assetClass, fetchedAt, now = new Date()) {
+  const fetched = new Date(fetchedAt);
+  const ageMs = now.getTime() - fetched.getTime();
+  if (!Number.isFinite(ageMs) || ageMs < 0) return "stale";
+  if (assetClass === "crypto") return ageMs <= 45 * 60 * 1000 ? "fresh" : "stale";
+  const timeZone = assetClass === "tw_equity" ? "Asia/Taipei" : "America/New_York";
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone, weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+  }).formatToParts(now);
+  const value = (type) => parts.find((part) => part.type === type)?.value || "";
+  const weekday = value("weekday");
+  const hour = Number(value("hour"));
+  const minute = Number(value("minute"));
+  const openMinute = assetClass === "tw_equity" ? 9 * 60 : 9 * 60 + 30;
+  const weekendGrace = ["Sat", "Sun"].includes(weekday)
+    || (weekday === "Mon" && hour * 60 + minute < openMinute);
+  return ageMs <= (weekendGrace ? 96 : 36) * 60 * 60 * 1000 ? "fresh" : "stale";
+}
+
 function setTone(element, value) {
   element.classList.remove("is-positive", "is-negative");
   if (num(value) > 0) element.classList.add("is-positive");
@@ -325,6 +344,8 @@ function buildDashboard(raw) {
       marketPrice: nativePrice,
       marketPriceCurrency: price?.quote_currency || asset.quote_currency,
       marketPriceAt: price?.price_at || price?.fetched_at || null,
+      marketPriceFetchedAt: price?.fetched_at || null,
+      marketPriceStatus: price ? quoteFreshness(asset.asset_class, price.fetched_at) : "missing",
       marketValueNative,
       marketValueTwd,
       unrealizedPnlTwd: marketValueTwd === null ? null : marketValueTwd - costTwd,
@@ -385,6 +406,8 @@ function buildDashboard(raw) {
       marketPrice: price?.price === null || price?.price === undefined ? num(component.latest_price) || null : num(price.price),
       marketPriceCurrency: price?.quote_currency || component.native_currency,
       marketPriceAt: price?.price_at || price?.fetched_at || component.source_updated_at,
+      marketPriceFetchedAt: price?.fetched_at || component.source_updated_at,
+      marketPriceStatus: price ? quoteFreshness(component.asset_class, price.fetched_at) : "stale",
       marketValueNative: null,
       marketValueTwd: currentValue,
       unrealizedPnlTwd: currentValue - costTwd,
@@ -461,6 +484,14 @@ function buildDashboard(raw) {
   const realizedPnlTwd = investablePositions.reduce((sum, row) => sum + num(row.realizedPnlTwd), 0) + gridPnlUsd * pooledCostFx;
   const incomeTwd = incomeEvents.reduce((sum, event) => sum + num(event.net_amount) * (event.currency === "TWD" ? 1 : pooledCostFx), 0);
   const priceTimes = raw.marketPrices.filter((row) => row.status === "success").map((row) => row.fetched_at).filter(Boolean).sort();
+  const marketUpdates = Object.fromEntries(["tw_equity", "us_equity", "crypto"].map((assetClass) => {
+    const times = openPositions
+      .filter((row) => row.assetClass === assetClass && row.marketPriceAt)
+      .map((row) => row.marketPriceAt)
+      .sort();
+    return [assetClass, times.at(-1) || null];
+  }));
+  const stalePriceCount = openPositions.filter((row) => row.marketPriceStatus === "stale").length;
 
   return {
     portfolio,
@@ -484,7 +515,9 @@ function buildDashboard(raw) {
     unrealizedPnlPct: financialCostTwd > 0 ? unrealizedPnlTwd / financialCostTwd * 100 : null,
     realizedPnlTwd,
     incomeTwd,
-    updatedAt: priceTimes.at(-1) || null
+    updatedAt: priceTimes.at(-1) || null,
+    marketUpdates,
+    stalePriceCount
   };
 }
 
@@ -565,7 +598,7 @@ function positionCard(position) {
     <div class="position-details">
       <span class="position-detail"><span>持有數量</span><strong class="private-number">${quantity(position.quantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</strong></span>
       <span class="position-detail"><span>持倉均價</span><strong class="private-number">${perSharePrice(position.averageCost, position.quoteCurrency, position.assetClass)}</strong></span>
-      <span class="position-detail"><span>最新價格</span><strong class="private-number">${perSharePrice(position.marketPrice, position.marketPriceCurrency, position.assetClass)}</strong></span>
+      <span class="position-detail"><span>最新價格</span><strong class="private-number">${perSharePrice(position.marketPrice, position.marketPriceCurrency, position.assetClass)}${position.marketPriceStatus === "stale" ? '<small class="price-status is-stale">行情過期</small>' : ""}</strong></span>
       <span class="position-detail"><span>累計買入均價</span><strong class="private-number">${perSharePrice(position.buyAveragePrice, position.quoteCurrency, position.assetClass)}</strong></span>
       <span class="position-detail"><span>剩餘成本</span><strong class="private-number">${money(position.costTwd)}</strong></span>
       <span class="position-detail"><span>累計賣出均價</span><strong class="private-number">${perSharePrice(position.sellAveragePrice, position.quoteCurrency, position.assetClass)}</strong></span>
@@ -652,7 +685,12 @@ function renderActivity() {
 function renderOverview() {
   const data = state.data;
   byId("portfolio-name").textContent = data.portfolio.name;
-  byId("data-updated-at").textContent = `行情 ${dateTime(data.updatedAt)}`;
+  const marketLabels = [
+    ["台股", data.marketUpdates.tw_equity],
+    ["美股", data.marketUpdates.us_equity],
+    ["加密", data.marketUpdates.crypto]
+  ].filter(([, value]) => value).map(([label, value]) => `${label} ${dateTime(value)}`);
+  byId("data-updated-at").textContent = `${marketLabels.join(" · ")}${data.stalePriceCount ? ` · ${data.stalePriceCount} 檔過期` : ""}`;
   byId("user-email").textContent = state.userEmail || "已登入";
   byId("total-assets").textContent = money(data.totalAssetsTwd);
   byId("total-assets-note").textContent = data.propertyValueTwd > 0 ? `含房地產淨值 ${money(data.propertyValueTwd)}` : "目前未納入房地產淨值";

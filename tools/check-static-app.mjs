@@ -34,6 +34,10 @@ for (const token of ["function transactionCashflow", "function transactionCashfl
 for (const token of ["未實現損益", "已實現合計", "const realizedTotal"]) {
   if (!app.includes(token)) throw new Error(`Missing position profit detail: ${token}`);
 }
+for (const token of ["function quoteFreshness", "marketPriceStatus", "行情過期", "marketUpdates", "stalePriceCount"]) {
+  if (!app.includes(token)) throw new Error(`Missing market-price freshness behavior: ${token}`);
+}
+if (!html.includes("重新讀取已同步行情")) throw new Error("Mobile refresh control must disclose that it rereads synchronized prices");
 for (const token of ["cashValueTwd", "runningGridCount", "runningGridPnlUsd"]) {
   if (!app.includes(token)) throw new Error(`Missing overview capital or strategy signal: ${token}`);
 }
