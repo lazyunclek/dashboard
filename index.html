@@ -48,8 +48,8 @@
     <section class="dashboard-view" id="dashboard-view" hidden>
       <header class="topbar">
         <div>
-          <p class="eyebrow">INVESTMENTS / SUPABASE</p>
-          <h1>投資總覽</h1>
+          <p class="eyebrow" id="dashboard-eyebrow">INVESTMENTS / SUPABASE</p>
+          <h1 id="dashboard-title">投資總覽</h1>
         </div>
         <div class="topbar-actions">
           <button class="icon-button" id="privacy-toggle" type="button" aria-label="隱藏金額" title="隱藏金額">◉</button>
@@ -75,6 +75,7 @@
       <nav class="tabbar" aria-label="Dashboard sections">
         <button class="tab is-active" data-tab="overview" type="button">總覽</button>
         <button class="tab" data-tab="positions" type="button">持倉</button>
+        <button class="tab tab-create" id="mobile-cashbook-add" type="button" aria-label="新增日常帳目"><span>＋</span><small>記一筆</small></button>
         <button class="tab" data-tab="cashbook" type="button">日常</button>
         <button class="tab" data-tab="activity" type="button">投資</button>
       </nav>
@@ -176,36 +177,41 @@
             <p class="eyebrow">DAILY CASHBOOK</p>
             <h2>日常記帳</h2>
           </div>
-          <button id="cashbook-add-button" class="primary-button compact-button" type="button">＋ 記一筆</button>
         </div>
 
-        <div id="cashbook-account-strip" class="cashbook-account-strip" aria-label="帳戶餘額"></div>
+        <div class="cashbook-view-switch" role="group" aria-label="日常帳本檢視">
+          <button class="is-active" data-cashbook-view="ledger" type="button">帳本</button>
+          <button data-cashbook-view="accounts" type="button">帳戶</button>
+        </div>
 
-        <section class="content-card cashbook-calendar-card" aria-labelledby="cashbook-month-label">
-          <div class="cashbook-month-toolbar">
-            <button id="cashbook-prev-month" class="calendar-nav-button" type="button">上月</button>
-            <div>
-              <strong id="cashbook-month-label">—</strong>
-              <small>點一天看紀錄，再點同一天新增</small>
+        <div id="cashbook-ledger-view" class="cashbook-ledger-view">
+          <section class="cashbook-calendar-card" aria-labelledby="cashbook-month-label">
+            <div class="cashbook-month-toolbar">
+              <button id="cashbook-prev-month" class="calendar-nav-button" type="button" aria-label="上個月">‹</button>
+              <div>
+                <strong id="cashbook-month-label">—</strong>
+                <small>點一天看紀錄，再點同一天新增</small>
+              </div>
+              <button id="cashbook-next-month" class="calendar-nav-button" type="button" aria-label="下個月">›</button>
             </div>
-            <button id="cashbook-next-month" class="calendar-nav-button" type="button">下月</button>
-          </div>
-          <div class="cashbook-weekdays" aria-hidden="true">
-            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
-          </div>
-          <div id="cashbook-calendar-grid" class="cashbook-calendar-grid"></div>
-        </section>
+            <div class="cashbook-weekdays" aria-hidden="true">
+              <span>週日</span><span>週一</span><span>週二</span><span>週三</span><span>週四</span><span>週五</span><span>週六</span>
+            </div>
+            <div id="cashbook-calendar-grid" class="cashbook-calendar-grid"></div>
+          </section>
 
-        <section class="content-card cashbook-day-card" aria-live="polite">
-          <div class="section-head">
-            <div>
-              <p class="eyebrow">SELECTED DAY</p>
+          <section class="cashbook-day-card" aria-live="polite">
+            <div class="cashbook-day-heading">
               <h2 id="cashbook-selected-date">請選擇日期</h2>
+              <span id="cashbook-entry-count" class="count-badge">0</span>
             </div>
-            <span id="cashbook-entry-count" class="count-badge">0</span>
-          </div>
-          <p id="cashbook-day-hint" class="filter-note">第一次點日期只顯示當日紀錄。</p>
-          <div id="cashbook-entry-list" class="cashbook-entry-list"></div>
+            <p id="cashbook-day-hint" class="filter-note">第一次點日期只顯示當日紀錄。</p>
+            <div id="cashbook-entry-list" class="cashbook-entry-list"></div>
+          </section>
+        </div>
+
+        <section id="cashbook-accounts-view" class="cashbook-accounts-view" aria-label="帳戶餘額" hidden>
+          <div id="cashbook-account-strip" class="cashbook-account-list"></div>
         </section>
       </section>
 

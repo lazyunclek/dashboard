@@ -33,6 +33,7 @@ const state = {
     month: new Date().toISOString().slice(0, 7),
     selectedDate: new Date().toISOString().slice(0, 10),
     armedDate: "",
+    view: "ledger",
     editingEvent: null
   },
   numbersHidden: window.localStorage.getItem(storageKeys.privacy) === "true",
@@ -745,15 +746,40 @@ function renderCashbookAccounts() {
     strip.innerHTML = '<div class="empty-state">尚未建立日常帳戶，請先在桌面版建立帳戶。</div>';
     return;
   }
-  for (const account of accounts) {
-    const card = document.createElement("article");
-    card.className = `cashbook-account-card ${account.account_type === "asset_cost" ? "is-asset-cost" : ""}`;
-    const accountKind = account.account_type === "asset_cost"
-      ? cashbookAssetClassLabels[account.asset_class] || "資產成本"
-      : cashbookAccountTypeLabels[account.account_type] || account.account_type;
-    card.innerHTML = `<span>${escapeHtml(accountKind)}</span><strong>${escapeHtml(account.name)}</strong><b class="private-number">${cashbookMoney(account.balance, account.currency)}</b>`;
-    strip.append(card);
+  const groupDefinitions = [
+    ["現金", (row) => row.account_type === "cash"],
+    ["銀行", (row) => row.account_type === "bank"],
+    ["電子支付與卡片", (row) => ["electronic_payment", "debit_card", "credit_card"].includes(row.account_type)],
+    ["資產成本", (row) => row.account_type === "asset_cost"]
+  ];
+  for (const [title, predicate] of groupDefinitions) {
+    const rows = accounts.filter(predicate);
+    if (!rows.length) continue;
+    const section = document.createElement("section");
+    section.className = "cashbook-account-group";
+    const currencies = new Set(rows.map((row) => row.currency));
+    const summary = currencies.size === 1
+      ? cashbookMoney(rows.reduce((sum, row) => sum + num(row.balance), 0), rows[0].currency)
+      : `${rows.length} 個帳戶`;
+    section.innerHTML = `<div class="cashbook-account-group-title"><span>${escapeHtml(title)}</span><strong class="private-number">${escapeHtml(summary)}</strong></div>`;
+    for (const account of rows) {
+      const row = document.createElement("article");
+      row.className = `cashbook-account-row ${num(account.balance) < 0 ? "is-negative" : ""}`;
+      const accountKind = account.account_type === "asset_cost"
+        ? cashbookAssetClassLabels[account.asset_class] || "資產成本"
+        : cashbookAccountTypeLabels[account.account_type] || account.account_type;
+      row.innerHTML = `<span class="cashbook-account-copy"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.currency)} · ${escapeHtml(accountKind)}</small></span><b class="cashbook-account-balance private-number">${cashbookMoney(account.balance, account.currency)}</b>`;
+      section.append(row);
+    }
+    strip.append(section);
   }
+}
+
+function showCashbookView(viewName) {
+  state.cashbook.view = viewName === "accounts" ? "accounts" : "ledger";
+  byId("cashbook-ledger-view").hidden = state.cashbook.view !== "ledger";
+  byId("cashbook-accounts-view").hidden = state.cashbook.view !== "accounts";
+  document.querySelectorAll("[data-cashbook-view]").forEach((button) => button.classList.toggle("is-active", button.dataset.cashbookView === state.cashbook.view));
 }
 
 function renderCashbookCalendar() {
@@ -848,6 +874,7 @@ function renderCashbook() {
   renderCashbookAccounts();
   renderCashbookCalendar();
   renderCashbookDay();
+  showCashbookView(state.cashbook.view);
 }
 
 function shiftCashbookMonth(offset) {
@@ -1246,6 +1273,16 @@ function renderDashboard() {
 
 function showTab(tabName) {
   state.activeTab = tabName;
+  const tabHeadings = {
+    overview: ["INVESTMENTS / SUPABASE", "投資總覽"],
+    positions: ["PORTFOLIO", "持倉"],
+    cashbook: ["DAILY CASHBOOK", "日常記帳"],
+    activity: ["INVESTMENT LEDGER", "投資帳本"],
+  };
+  const [eyebrow, title] = tabHeadings[tabName] || tabHeadings.overview;
+  byId("dashboard-eyebrow").textContent = eyebrow;
+  byId("dashboard-title").textContent = title;
+  dashboardView.dataset.activeTab = tabName;
   document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.tab === tabName));
   document.querySelectorAll(".tab-panel").forEach((panel) => { panel.hidden = panel.dataset.panel !== tabName; });
   if (tabName === "cashbook" && !state.cashbook.loaded && !state.cashbook.loading) void loadCashbook();
@@ -1282,7 +1319,7 @@ loginForm.addEventListener("submit", async (event) => {
   }
 });
 
-document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => showTab(tab.dataset.tab)));
+document.querySelectorAll(".tab[data-tab]").forEach((tab) => tab.addEventListener("click", () => showTab(tab.dataset.tab)));
 document.querySelectorAll("[data-go-tab]").forEach((button) => button.addEventListener("click", () => showTab(button.dataset.goTab)));
 document.querySelectorAll("#position-filters .filter-chip").forEach((button) => button.addEventListener("click", () => {
   state.marketFilter = button.dataset.market;
@@ -1344,7 +1381,12 @@ document.addEventListener("click", (event) => {
 
 byId("cashbook-prev-month").addEventListener("click", () => shiftCashbookMonth(-1));
 byId("cashbook-next-month").addEventListener("click", () => shiftCashbookMonth(1));
-byId("cashbook-add-button").addEventListener("click", () => openCashbookForm());
+byId("mobile-cashbook-add").addEventListener("click", async () => {
+  if (!state.cashbook.loaded && !state.cashbook.loading) await loadCashbook();
+  showTab("cashbook");
+  if (state.cashbook.loaded) openCashbookForm();
+});
+document.querySelectorAll("[data-cashbook-view]").forEach((button) => button.addEventListener("click", () => showCashbookView(button.dataset.cashbookView)));
 byId("cashbook-close-button").addEventListener("click", closeCashbookForm);
 byId("cashbook-sheet").addEventListener("click", (event) => { if (event.target === byId("cashbook-sheet")) closeCashbookForm(); });
 byId("cashbook-form").addEventListener("submit", saveCashbookEvent);

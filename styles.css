@@ -63,7 +63,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   min-height: 100vh;
   min-height: 100dvh;
   margin: 0 auto;
-  padding: max(22px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(30px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  padding: max(22px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(94px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
 }
 
 .login-view {
@@ -185,20 +185,24 @@ input::placeholder { color: #53645a; }
 .status-actions span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .tabbar {
-  position: sticky;
-  z-index: 10;
-  top: max(8px, env(safe-area-inset-top));
+  position: fixed;
+  z-index: 50;
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: rgba(6, 14, 9, 0.9);
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  padding: 7px max(8px, env(safe-area-inset-right)) max(7px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  border-top: 1px solid var(--line);
+  background: rgba(4, 9, 6, 0.96);
   backdrop-filter: blur(15px);
 }
-.tab { min-height: 40px; border-radius: 10px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 700; }
-.tab.is-active { color: var(--text); background: var(--accent-soft); box-shadow: inset 0 0 0 1px rgba(136, 255, 86, 0.16); }
+.tab { min-height: 50px; border-radius: 10px; color: var(--muted); background: transparent; font-size: 11px; font-weight: 700; }
+.tab.is-active { color: var(--accent); background: transparent; box-shadow: none; }
+.tab-create { display: grid; place-items: center; color: var(--accent); }
+.tab-create span { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; color: #07100b; background: var(--accent); font: 800 25px/1 var(--sans); }
+.tab-create small { margin-top: 2px; font-size: 9px; }
 
 .loading-card, .error-card { padding: 30px 18px; border-radius: var(--radius); text-align: center; }
 .loading-card { display: flex; gap: 12px; justify-content: center; align-items: center; color: var(--muted); font-size: 13px; }
@@ -308,27 +312,25 @@ input::placeholder { color: #53645a; }
 
 .compact-button { min-height: 40px; padding: 0 15px; white-space: nowrap; font-size: 12px; }
 .cashbook-title-row { align-items: flex-end; }
-.cashbook-account-strip { display: flex; gap: 9px; margin-inline: -16px; padding: 0 16px 2px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; }
-.cashbook-account-strip::-webkit-scrollbar { display: none; }
-.cashbook-account-card { flex: 0 0 155px; min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel-soft); scroll-snap-align: start; }
-.cashbook-account-card.is-asset-cost { border-color: rgba(136, 255, 86, 0.27); }
-.cashbook-account-card span { display: block; color: var(--muted); font-size: 9px; }
-.cashbook-account-card strong { display: block; margin-top: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-.cashbook-account-card b { display: block; margin-top: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 13px/1 var(--mono); }
-.cashbook-calendar-card { padding: 15px; }
+.cashbook-view-switch { display: grid; grid-template-columns: repeat(2, 1fr); width: min(100%, 270px); margin: 0 auto; padding: 3px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--bg-deep); }
+.cashbook-view-switch button { min-height: 38px; border: 0; border-radius: 9px; color: var(--muted); background: transparent; font-size: 12px; font-weight: 750; cursor: pointer; }
+.cashbook-view-switch button.is-active { color: #07100b; background: var(--text); }
+.cashbook-ledger-view { display: grid; gap: 0; margin-inline: -16px; }
+.cashbook-calendar-card { min-width: 0; padding: 12px 12px 7px; border-block: 1px solid var(--line); background: rgba(2, 7, 4, 0.6); }
 .cashbook-month-toolbar { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; text-align: center; }
 .cashbook-month-toolbar > div { min-width: 0; }
-.cashbook-month-toolbar strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 750 15px/1.2 var(--mono); }
+.cashbook-month-toolbar strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 20px; font-weight: 650; line-height: 1.2; }
 .cashbook-month-toolbar small { display: block; margin-top: 6px; color: var(--muted); font-size: 9px; }
 .calendar-nav-button, .sheet-close-button, .danger-button { min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: transparent; font-size: 11px; cursor: pointer; }
-.cashbook-weekdays, .cashbook-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
-.cashbook-weekdays { margin-top: 17px; color: #64766c; text-align: center; font: 9px/1 var(--mono); }
-.cashbook-calendar-grid { margin-top: 9px; }
-.calendar-spacer { min-height: 47px; }
-.cashbook-day-button { display: grid; min-width: 0; min-height: 47px; padding: 6px 2px 5px; place-items: center; border: 1px solid transparent; border-radius: 10px; color: var(--muted); background: transparent; cursor: pointer; }
+.calendar-nav-button { min-width: 42px; border-color: transparent; font-size: 30px; font-weight: 300; }
+.cashbook-weekdays, .cashbook-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0; }
+.cashbook-weekdays { margin: 18px -12px 0; padding-bottom: 9px; border-bottom: 1px solid var(--line); color: #708078; text-align: center; font-size: 10px; line-height: 1; }
+.cashbook-calendar-grid { margin-inline: -12px; }
+.calendar-spacer { min-height: 54px; background: rgba(255, 255, 255, 0.018); }
+.cashbook-day-button { display: grid; min-width: 0; min-height: 54px; padding: 7px 2px 6px; place-items: center; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--text); background: transparent; cursor: pointer; }
 .cashbook-day-button.is-today { border-color: var(--line-strong); color: var(--text); }
-.cashbook-day-button.is-selected { border-color: rgba(136, 255, 86, 0.36); color: #07100b; background: var(--accent); }
-.cashbook-day-button > span { font: 700 11px/1 var(--mono); }
+.cashbook-day-button.is-selected { color: #07100b; background: var(--accent); }
+.cashbook-day-button > span { font: 650 14px/1 var(--sans); }
 .cashbook-day-button > b { display: flex; min-height: 5px; gap: 2px; margin-top: 6px; }
 .cashbook-day-button i { width: 4px; height: 4px; border-radius: 50%; background: var(--muted); }
 .cashbook-day-button i.is-expense { background: var(--negative); }
@@ -336,19 +338,35 @@ input::placeholder { color: #53645a; }
 .cashbook-day-button i.is-transfer, .cashbook-day-button i.is-exchange, .cashbook-day-button i.is-credit_card_payment, .cashbook-day-button i.is-investment_funding_transfer { background: var(--warning); }
 .cashbook-day-button i.is-usd { background: #84b7ff; }
 .cashbook-day-button.is-selected i { box-shadow: 0 0 0 1px rgba(7, 16, 11, 0.4); }
-.cashbook-day-card { padding: 17px; }
-.cashbook-entry-list { display: grid; gap: 9px; margin-top: 14px; }
-.cashbook-entry-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 11px; align-items: center; width: 100%; padding: 13px; border: 1px solid var(--line); border-radius: 13px; color: var(--text); background: var(--panel-soft); text-align: left; cursor: pointer; }
-.cashbook-entry-type { display: grid; min-width: 42px; height: 34px; padding: 0 6px; place-items: center; border-radius: 9px; font-size: 9px; font-weight: 800; }
-.cashbook-entry-type.is-expense { color: var(--negative); background: rgba(255, 127, 133, 0.09); }
-.cashbook-entry-type.is-income { color: var(--positive); background: rgba(130, 246, 163, 0.09); }
-.cashbook-entry-type.is-transfer { color: var(--warning); background: rgba(247, 207, 104, 0.09); }
+.cashbook-day-card { padding: 17px 16px 0; background: rgba(8, 17, 11, 0.85); }
+.cashbook-day-heading { display: flex; justify-content: space-between; align-items: center; }
+.cashbook-day-heading h2 { font-size: 15px; }
+.cashbook-entry-list { display: grid; margin: 10px -16px 0; }
+.cashbook-entry-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%; min-height: 76px; padding: 13px 16px; border: 0; border-top: 1px solid var(--line); border-radius: 0; color: var(--text); background: rgba(255, 255, 255, 0.025); text-align: left; cursor: pointer; }
+.cashbook-entry-type { display: none; }
 .cashbook-entry-copy { min-width: 0; }
 .cashbook-entry-copy strong, .cashbook-entry-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cashbook-entry-copy strong { font-size: 12px; }
-.cashbook-entry-copy small { margin-top: 5px; color: var(--muted); font-size: 9px; }
-.cashbook-entry-value { max-width: 118px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font: 700 11px/1.25 var(--mono); }
+.cashbook-entry-copy strong { font-size: 15px; font-weight: 620; }
+.cashbook-entry-copy small { margin-top: 7px; color: var(--muted); font-size: 11px; }
+.cashbook-entry-value { max-width: 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font: 700 14px/1.25 var(--mono); }
 .cashbook-entry-value small { display: block; margin-top: 5px; color: var(--muted); font: 9px/1 var(--sans); }
+.cashbook-accounts-view { margin-inline: -16px; border-block: 1px solid var(--line); background: rgba(8, 17, 11, 0.85); }
+.cashbook-account-group + .cashbook-account-group { margin-top: 18px; }
+.cashbook-account-group-title { display: flex; justify-content: space-between; padding: 12px 16px 8px; color: var(--muted); font-size: 12px; }
+.cashbook-account-group-title strong { color: var(--muted); font: 500 12px/1 var(--mono); }
+.cashbook-account-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; min-height: 74px; padding: 12px 16px; border-top: 1px solid var(--line); background: rgba(255, 255, 255, 0.025); }
+.cashbook-account-copy { min-width: 0; }
+.cashbook-account-copy strong, .cashbook-account-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cashbook-account-copy strong { font-size: 16px; font-weight: 620; }
+.cashbook-account-copy small { margin-top: 6px; color: var(--muted); font: 12px/1 var(--mono); }
+.cashbook-account-balance { color: var(--positive); text-align: right; font: 650 16px/1.2 var(--mono); }
+.cashbook-account-row.is-negative .cashbook-account-balance { color: var(--negative); }
+
+@media (max-width: 679px) {
+  .dashboard-view[data-active-tab="cashbook"] .status-card,
+  .dashboard-view[data-active-tab="cashbook"] .cashbook-title-row { display: none; }
+  .dashboard-view[data-active-tab="cashbook"] { gap: 14px; }
+}
 
 body.sheet-open { overflow: hidden; }
 .sheet-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; align-items: end; padding-top: max(20px, env(safe-area-inset-top)); background: rgba(0, 0, 0, 0.72); backdrop-filter: blur(8px); }
@@ -376,16 +394,22 @@ body.numbers-hidden .private-value,
 body.numbers-hidden .private-number { filter: blur(8px); user-select: none; }
 
 @media (min-width: 680px) {
-  .app-shell { padding-inline: 28px; }
+  .app-shell { padding: max(22px, env(safe-area-inset-top)) 28px max(30px, env(safe-area-inset-bottom)); }
   .dashboard-view { grid-template-columns: 230px minmax(0, 1fr); align-items: start; }
   .topbar, .tabbar, .loading-card, .error-card, .tab-panel, .app-footer { grid-column: 2; }
   .status-card { position: sticky; top: 28px; grid-column: 1; grid-row: 1 / span 5; }
   .topbar { grid-row: 1; }
-  .tabbar { grid-row: 2; }
+  .tabbar { position: sticky; top: 28px; right: auto; bottom: auto; left: auto; grid-row: 2; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 14px; background: rgba(6, 14, 9, 0.9); }
+  .tab { min-height: 40px; font-size: 13px; }
+  .tab.is-active { color: var(--text); background: var(--accent-soft); box-shadow: inset 0 0 0 1px rgba(136, 255, 86, 0.16); }
+  .tab-create { display: none; }
   .loading-card, .error-card, .tab-panel { grid-row: 3; }
   .metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .metric-card { padding: 16px 13px; }
   .cashbook-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cashbook-ledger-view, .cashbook-accounts-view { margin-inline: 0; }
+  .cashbook-calendar-card, .cashbook-day-card, .cashbook-accounts-view { border: 1px solid var(--line); border-radius: var(--radius); }
+  .cashbook-day-card { margin-top: 14px; }
 }
 
 @media (max-width: 380px) {
@@ -395,8 +419,7 @@ body.numbers-hidden .private-number { filter: blur(8px); user-select: none; }
   .transaction-row { grid-template-columns: 38px minmax(0, 1fr); }
   .transaction-type { width: 38px; height: 38px; }
   .transaction-amount { grid-column: 2; text-align: left; }
-  .cashbook-entry-row { grid-template-columns: auto minmax(0, 1fr); }
-  .cashbook-entry-value { grid-column: 2; max-width: none; text-align: left; }
+  .cashbook-entry-row { grid-template-columns: minmax(0, 1fr) auto; }
   .tab { font-size: 12px; }
   .cashbook-month-toolbar { gap: 7px; }
   .calendar-nav-button { padding-inline: 9px; }
