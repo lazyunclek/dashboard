@@ -254,6 +254,39 @@ input::placeholder { color: #53645a; }
 .asset-group-value { text-align: right; font: 700 12px/1 var(--mono); }
 .allocation-track { height: 5px; overflow: hidden; border-radius: 999px; background: rgba(143, 163, 152, 0.12); }
 .allocation-bar { height: 100%; border-radius: inherit; background: var(--accent); box-shadow: 0 0 12px rgba(136, 255, 86, 0.3); }
+.exposure-card { display: grid; gap: 14px; }
+.exposure-head { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; }
+.segmented-control { display: grid; grid-template-columns: repeat(2, auto); gap: 3px; padding: 3px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--bg-deep); }
+.exposure-head .segmented-control { justify-self: start; }
+.segmented-control button { min-height: 32px; padding: 0 11px; border: 0; border-radius: 999px; color: var(--muted); background: transparent; font-size: 10px; font-weight: 750; }
+.segmented-control button.is-active { color: #07100b; background: var(--accent); }
+.exposure-note { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.exposure-summary { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; padding: 13px 14px; border: 1px solid var(--line); border-radius: 13px; background: var(--panel-soft); }
+.exposure-summary span { display: grid; min-width: 0; gap: 4px; }
+.exposure-summary small { color: var(--muted); font-size: 9px; }
+.exposure-summary strong { overflow: hidden; font-size: 13px; line-height: 1.4; }
+.exposure-summary b { color: var(--accent); font: 750 22px/1 var(--mono); }
+.exposure-list { display: grid; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; }
+.exposure-row { display: grid; width: 100%; min-width: 0; grid-template-columns: 5px minmax(0, 1fr) auto; gap: 11px; min-height: 58px; padding: 11px 13px; align-items: center; border: 0; border-bottom: 1px solid var(--line); background: rgba(4, 9, 6, 0.5); text-align: left; }
+.exposure-row:last-child { border-bottom: 0; }
+.exposure-row.is-active { background: var(--accent-soft); }
+.exposure-row > i { width: 5px; height: 30px; border-radius: 999px; background: var(--exposure-color); }
+.exposure-row > span { display: grid; min-width: 0; gap: 4px; }
+.exposure-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.exposure-row small { color: var(--muted); font: 9px/1.2 var(--mono); }
+.exposure-row > b { color: var(--accent); font: 750 11px/1 var(--mono); }
+.exposure-detail { overflow: hidden; border-top: 1px solid var(--line); }
+.exposure-detail-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; padding: 14px 0 10px; }
+.exposure-detail-head strong { font-size: 13px; }
+.exposure-detail-head span { color: var(--muted); font-size: 9px; text-align: right; }
+.exposure-members { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--line); border-radius: 12px; }
+.exposure-member { display: grid; min-width: 0; min-height: 68px; padding: 12px; align-content: center; grid-template-columns: minmax(0, 1fr); gap: 8px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.exposure-member:nth-child(even) { border-right: 0; }
+.exposure-member > span { display: grid; min-width: 0; gap: 3px; }
+.exposure-member > span:last-child { text-align: right; }
+.exposure-member strong, .exposure-member b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.exposure-member small { overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; font-size: 8.5px; }
+.exposure-warning { margin: 0; color: var(--warning); font-size: 10px; line-height: 1.5; }
 .overview-operations-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: var(--line); }
 .overview-operation { min-width: 0; padding: 14px; background: var(--panel-soft); }
 .overview-operation > span { display: block; color: var(--muted); font-size: 10px; }

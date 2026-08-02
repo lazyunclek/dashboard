@@ -23,6 +23,8 @@ const state = {
   transactionAssetId: "",
   transactionQuery: "",
   transactionType: "all",
+  exposureLevel: "primarySector",
+  selectedExposure: "",
   cashbook: {
     accounts: [],
     categories: [],
@@ -588,6 +590,7 @@ function buildDashboard(raw) {
     incomeEvents: incomeEvents.sort((a, b) => String(b.event_date).localeCompare(String(a.event_date))),
     assetsById,
     groups,
+    cashBalances,
     cashValueTwd,
     cashCurrencies,
     runningGridCount: runningGrids.length,
@@ -1328,6 +1331,94 @@ function renderOverview() {
     groups.append(row);
   }
 
+  renderExposure();
+
+}
+
+const exposurePalette = ["#9cff57", "#54d6a8", "#55a7ff", "#b58cff", "#f0c66c", "#ff8a8a", "#70d6ff", "#a7b28d", "#d7ff8c", "#7e8bff"];
+
+function exposureItems() {
+  const data = state.data;
+  const level = state.exposureLevel;
+  const items = data.positions
+    .filter((row) => num(row.marketValueTwd) > 0)
+    .map((row) => ({
+      label: row[level] || (level === "primarySector" ? "其他／待分類" : "未分類"),
+      subTheme: row.subTheme || "未分類",
+      symbol: row.displaySymbol || row.symbol,
+      name: row.name,
+      valueTwd: num(row.marketValueTwd)
+    }));
+  for (const cash of data.cashBalances.filter((row) => Math.abs(row.valueTwd) > 0)) {
+    const currency = String(cash.currency || "").toUpperCase();
+    items.push({
+      label: level === "primarySector" ? "現金（含台幣、美元與穩定幣）" : currency,
+      subTheme: currency,
+      symbol: currency,
+      name: ({ TWD: "台幣現金", USD: "美元現金", USDC: "USDC 穩定幣", USDT: "USDT 穩定幣" })[currency] || `${currency} 現金`,
+      valueTwd: num(cash.valueTwd),
+      isCash: true
+    });
+  }
+  const gridGroup = data.groups.find((group) => group.key === "crypto");
+  const spotCryptoValue = data.positions.filter((row) => row.assetClass === "crypto").reduce((sum, row) => sum + num(row.marketValueTwd), 0);
+  const gridValue = Math.max(0, num(gridGroup?.valueTwd) - spotCryptoValue);
+  if (gridValue) items.push({ label: level === "primarySector" ? "網格策略" : "合約網格", subTheme: "合約網格", symbol: "GRID", name: "運行中與已關閉策略淨值", valueTwd: gridValue });
+  if (data.propertyValueTwd > 0) items.push({ label: level === "primarySector" ? "房地產" : "房屋與車位", subTheme: "房屋與車位", symbol: "PROPERTY", name: "已付可回收本金＋預估獲利", valueTwd: data.propertyValueTwd });
+  return items;
+}
+
+function renderExposure() {
+  const items = exposureItems();
+  const grouped = new Map();
+  for (const item of items) {
+    const group = grouped.get(item.label) || { label: item.label, valueTwd: 0, members: [] };
+    group.valueTwd += item.valueTwd;
+    group.members.push(item);
+    grouped.set(item.label, group);
+  }
+  const groups = [...grouped.values()].filter((group) => group.valueTwd > 0).sort((a, b) => b.valueTwd - a.valueTwd);
+  const total = groups.reduce((sum, group) => sum + group.valueTwd, 0);
+  if (!state.selectedExposure || !grouped.has(state.selectedExposure)) state.selectedExposure = groups[0]?.label || "";
+  document.querySelectorAll("[data-exposure-level]").forEach((button) => button.classList.toggle("is-active", button.dataset.exposureLevel === state.exposureLevel));
+
+  const summary = byId("exposure-summary");
+  const selected = groups.find((group) => group.label === state.selectedExposure) || groups[0];
+  summary.innerHTML = selected ? `<span><small>目前選取</small><strong>${escapeHtml(selected.label)}</strong></span><b class="private-number">${(selected.valueTwd / total * 100).toFixed(1)}%</b>` : '<span>目前沒有可分類的資產市值</span>';
+
+  const list = byId("exposure-list");
+  list.replaceChildren();
+  groups.forEach((group, index) => {
+    const pct = total > 0 ? group.valueTwd / total * 100 : 0;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `exposure-row${group.label === state.selectedExposure ? " is-active" : ""}`;
+    button.dataset.exposureGroup = group.label;
+    button.innerHTML = `<i style="--exposure-color:${exposurePalette[index % exposurePalette.length]}"></i><span><strong>${escapeHtml(group.label)}</strong><small class="private-number">${overviewMoney(group.valueTwd)}</small></span><b class="private-number">${pct.toFixed(1)}%</b>`;
+    list.append(button);
+  });
+
+  const detail = byId("exposure-detail");
+  detail.replaceChildren();
+  if (selected) {
+    const head = document.createElement("div");
+    head.className = "exposure-detail-head";
+    head.innerHTML = `<strong>${escapeHtml(selected.label)}</strong><span>${selected.members.length} 個項目 · <span class="private-number">${overviewMoney(selected.valueTwd)}</span></span>`;
+    detail.append(head);
+    const members = document.createElement("div");
+    members.className = "exposure-members";
+    [...selected.members].sort((a, b) => b.valueTwd - a.valueTwd).forEach((member) => {
+      const row = document.createElement("div");
+      row.className = "exposure-member";
+      row.innerHTML = `<span><strong>${escapeHtml(member.symbol)}</strong><small>${escapeHtml(member.name || "")}</small></span><span><b class="private-number">${overviewMoney(member.valueTwd)}</b><small>${total > 0 ? (member.valueTwd / total * 100).toFixed(2) : "0.00"}%</small></span>`;
+      members.append(row);
+    });
+    detail.append(members);
+  }
+  const difference = total - state.data.totalAssetsTwd;
+  const warning = byId("exposure-warning");
+  warning.hidden = Math.abs(difference) < 1;
+  warning.textContent = warning.hidden ? "" : `分類合計與總資產相差 ${overviewMoney(difference, true)}，請確認行情時間。`;
 }
 
 function renderDashboard() {
@@ -1416,6 +1507,19 @@ byId("clear-transaction-search").addEventListener("click", () => {
 });
 
 document.addEventListener("click", (event) => {
+  const exposureLevel = event.target.closest("[data-exposure-level]");
+  if (exposureLevel) {
+    state.exposureLevel = exposureLevel.dataset.exposureLevel;
+    state.selectedExposure = "";
+    renderExposure();
+    return;
+  }
+  const exposureGroup = event.target.closest("[data-exposure-group]");
+  if (exposureGroup) {
+    state.selectedExposure = exposureGroup.dataset.exposureGroup;
+    renderExposure();
+    return;
+  }
   const calendarDate = event.target.closest("[data-cashbook-date]");
   if (calendarDate) {
     const dateKey = calendarDate.dataset.cashbookDate;
