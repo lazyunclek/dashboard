@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#07100b">
   <meta name="color-scheme" content="dark">
-  <meta name="description" content="個人投資組合唯讀行動儀表板">
+  <meta name="description" content="個人投資與日常記帳行動儀表板">
   <title>投資儀表板</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
@@ -22,9 +22,9 @@
         <span>QUANT LAB</span>
       </div>
       <div class="login-card">
-        <p class="eyebrow">PRIVATE / READ ONLY</p>
+        <p class="eyebrow">PRIVATE / PERSONAL</p>
         <h1 id="login-title">投資儀表板</h1>
-        <p class="login-copy">登入後從 Supabase 讀取你的最新帳本。這個手機版只能查看，不提供新增、修改或刪除。</p>
+        <p class="login-copy">登入後查看投資，並在手機上新增或修改自己的日常帳目。每筆資料都由 Supabase 權限隔離。</p>
         <form id="login-form" autocomplete="on">
           <label>
             <span>Email</span>
@@ -35,7 +35,7 @@
             <input id="password" name="password" type="password" autocomplete="current-password" required>
           </label>
           <label class="remember-row">
-            <input id="remember-device" type="checkbox" checked>
+            <input id="remember-device" type="checkbox">
             <span>記住這支裝置（不保存密碼）</span>
           </label>
           <button class="primary-button" id="login-button" type="submit">登入查看</button>
@@ -75,7 +75,8 @@
       <nav class="tabbar" aria-label="Dashboard sections">
         <button class="tab is-active" data-tab="overview" type="button">總覽</button>
         <button class="tab" data-tab="positions" type="button">持倉</button>
-        <button class="tab" data-tab="activity" type="button">帳本</button>
+        <button class="tab" data-tab="cashbook" type="button">日常</button>
+        <button class="tab" data-tab="activity" type="button">投資</button>
       </nav>
 
       <div class="loading-card" id="loading-card">
@@ -169,6 +170,45 @@
         <div id="positions-list" class="position-list"></div>
       </section>
 
+      <section class="tab-panel cashbook-panel" data-panel="cashbook" id="cashbook-panel" hidden>
+        <div class="section-head cashbook-title-row">
+          <div>
+            <p class="eyebrow">DAILY CASHBOOK</p>
+            <h2>日常記帳</h2>
+          </div>
+          <button id="cashbook-add-button" class="primary-button compact-button" type="button">＋ 記一筆</button>
+        </div>
+
+        <div id="cashbook-account-strip" class="cashbook-account-strip" aria-label="帳戶餘額"></div>
+
+        <section class="content-card cashbook-calendar-card" aria-labelledby="cashbook-month-label">
+          <div class="cashbook-month-toolbar">
+            <button id="cashbook-prev-month" class="calendar-nav-button" type="button">上月</button>
+            <div>
+              <strong id="cashbook-month-label">—</strong>
+              <small>點一天看紀錄，再點同一天新增</small>
+            </div>
+            <button id="cashbook-next-month" class="calendar-nav-button" type="button">下月</button>
+          </div>
+          <div class="cashbook-weekdays" aria-hidden="true">
+            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+          </div>
+          <div id="cashbook-calendar-grid" class="cashbook-calendar-grid"></div>
+        </section>
+
+        <section class="content-card cashbook-day-card" aria-live="polite">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">SELECTED DAY</p>
+              <h2 id="cashbook-selected-date">請選擇日期</h2>
+            </div>
+            <span id="cashbook-entry-count" class="count-badge">0</span>
+          </div>
+          <p id="cashbook-day-hint" class="filter-note">第一次點日期只顯示當日紀錄。</p>
+          <div id="cashbook-entry-list" class="cashbook-entry-list"></div>
+        </section>
+      </section>
+
       <section class="tab-panel" data-panel="activity" id="activity-panel" hidden>
         <div class="section-head">
           <div>
@@ -203,11 +243,65 @@
       </section>
 
       <footer class="app-footer">
-        <span>唯讀行動版</span>
+        <span>投資唯讀 · 日常帳本可編輯</span>
         <span>資料由 Supabase RLS 保護</span>
       </footer>
     </section>
   </main>
+
+  <div id="cashbook-sheet" class="sheet-backdrop" hidden>
+    <section class="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="cashbook-form-title">
+      <header class="sheet-header">
+        <div>
+          <p class="eyebrow">DAILY CASHBOOK</p>
+          <h2 id="cashbook-form-title">新增帳目</h2>
+        </div>
+        <button id="cashbook-close-button" class="sheet-close-button" type="button" aria-label="關閉">關閉</button>
+      </header>
+      <form id="cashbook-form" class="cashbook-form">
+        <div class="cashbook-form-grid">
+          <label><span>類型</span><select id="cashbook-event-type" required>
+            <option value="expense">支出</option>
+            <option value="income">收入</option>
+            <option value="transfer">轉帳／換匯</option>
+            <option value="investment_funding_transfer">資產投入</option>
+            <option value="opening_balance">初始化餘額</option>
+          </select></label>
+          <label><span>日期</span><input id="cashbook-occurred-on" type="date" required></label>
+          <label id="cashbook-merchant-field"><span id="cashbook-merchant-label">商家／對象</span><input id="cashbook-merchant" type="text" autocomplete="off"></label>
+          <label id="cashbook-source-field"><span id="cashbook-source-label">付款帳戶</span><select id="cashbook-source-account"></select></label>
+          <label id="cashbook-destination-field"><span id="cashbook-destination-label">入帳帳戶</span><select id="cashbook-destination-account"></select></label>
+          <label id="cashbook-category-field"><span>品類</span><select id="cashbook-category"></select></label>
+          <label id="cashbook-recovery-field" hidden><span>房地產成本回收屬性</span><select id="cashbook-property-recovery">
+            <option value="">請選擇</option>
+            <option value="recoverable">可回收本金</option>
+            <option value="non_recoverable">費用／不保證回收</option>
+          </select></label>
+          <label id="cashbook-currency-field"><span>現場交易幣別</span><select id="cashbook-original-currency">
+            <option value="TWD">TWD</option><option value="USD">USD</option><option value="USDC">USDC</option><option value="USDT">USDT</option>
+          </select></label>
+          <label><span id="cashbook-amount-label">金額（TWD）</span><input id="cashbook-original-amount" type="number" min="0" step="0.01" inputmode="decimal" required></label>
+          <label id="cashbook-settled-field" hidden><span id="cashbook-settled-label">帳戶實際扣款</span><input id="cashbook-settled-amount" type="number" min="0" step="0.01" inputmode="decimal"></label>
+          <label id="cashbook-received-field" hidden><span id="cashbook-received-label">轉入帳戶實收</span><input id="cashbook-received-amount" type="number" min="0" step="0.01" inputmode="decimal"></label>
+          <label id="cashbook-fee-toggle-field" class="cashbook-check-field"><span>手續費</span><span class="cashbook-check-row"><input id="cashbook-has-fee" type="checkbox"><span>這筆交易另有手續費</span></span></label>
+          <label id="cashbook-fee-field" hidden><span>手續費</span><input id="cashbook-fee-amount" type="number" min="0" step="0.01" inputmode="decimal" value="0"></label>
+          <label class="cashbook-note-field"><span>備註</span><textarea id="cashbook-note" rows="2"></textarea></label>
+        </div>
+        <div class="cashbook-calculation" id="cashbook-calculation">
+          <span>AUTO CALCULATION</span>
+          <strong id="cashbook-calculation-title">選擇帳戶並輸入金額後自動計算</strong>
+          <small id="cashbook-calculation-note">交易匯率與有效匯率不需要手動輸入。</small>
+        </div>
+        <p id="cashbook-form-status" class="form-status" role="status"></p>
+        <footer class="sheet-actions">
+          <button id="cashbook-void-button" class="danger-button" type="button" hidden>作廢</button>
+          <button id="cashbook-save-button" class="primary-button" type="submit">儲存帳目</button>
+        </footer>
+      </form>
+    </section>
+  </div>
+
+  <div id="app-toast" class="app-toast" role="status" hidden></div>
 
   <script src="config.js"></script>
   <script type="module" src="app.js"></script>

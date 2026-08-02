@@ -23,6 +23,18 @@ const state = {
   transactionAssetId: "",
   transactionQuery: "",
   transactionType: "all",
+  cashbook: {
+    accounts: [],
+    categories: [],
+    ledger: [],
+    events: [],
+    loaded: false,
+    loading: false,
+    month: new Date().toISOString().slice(0, 7),
+    selectedDate: new Date().toISOString().slice(0, 10),
+    armedDate: "",
+    editingEvent: null
+  },
   numbersHidden: window.localStorage.getItem(storageKeys.privacy) === "true",
   loading: false
 };
@@ -100,6 +112,27 @@ async function rest(path, options = {}, retried = false) {
   if (response.status === 401 && !retried && await refreshSession()) return rest(path, options, true);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.message || payload.hint || `資料讀取失敗（${response.status}）`);
+  return payload;
+}
+
+const cashbookRpcNames = new Set(["cashbook_ensure_defaults", "cashbook_event_save", "cashbook_event_delete"]);
+
+async function cashbookRpc(name, body = {}, retried = false) {
+  if (!cashbookRpcNames.has(name)) throw new Error("不允許的日常帳本操作");
+  if (!state.accessToken) throw new Error("請先登入");
+  const response = await fetch(`${config.supabaseUrl}/rest/v1/rpc/${name}`, {
+    method: "POST",
+    headers: {
+      apikey: config.supabasePublishableKey,
+      Authorization: `Bearer ${state.accessToken}`,
+      "Content-Type": "application/json",
+      Accept: "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+  if (response.status === 401 && !retried && await refreshSession()) return cashbookRpc(name, body, true);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.message || payload.hint || `帳目操作失敗（${response.status}）`);
   return payload;
 }
 
@@ -618,6 +651,481 @@ function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
 }
 
+const cashbookTypeLabels = {
+  expense: "支出",
+  income: "收入",
+  transfer: "轉帳",
+  exchange: "換匯",
+  credit_card_payment: "信用卡繳款",
+  investment_funding_transfer: "資產投入",
+  opening_balance: "初始化餘額"
+};
+const cashbookAccountTypeLabels = {
+  cash: "現金",
+  bank: "銀行",
+  electronic_payment: "電子支付",
+  debit_card: "金融卡／儲值卡",
+  credit_card: "信用卡",
+  asset_cost: "資產成本"
+};
+const cashbookAssetClassLabels = { crypto: "虛擬貨幣", tw_equity: "台股", us_equity: "美股", real_estate: "房地產" };
+const usdEquivalentCurrencies = new Set(["USD", "USDC", "USDT"]);
+
+function localDateKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function cashbookMonthBounds(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const next = new Date(year, month, 1);
+  return {
+    start: `${year}-${String(month).padStart(2, "0")}-01`,
+    end: `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-01`
+  };
+}
+
+function cashbookMoney(value, currency = "TWD", signed = false) {
+  return money(value, currency, signed).replace(/^USD /, "US$");
+}
+
+function showToast(message) {
+  const toast = byId("app-toast");
+  toast.textContent = message;
+  toast.hidden = false;
+  window.clearTimeout(showToast.timer);
+  showToast.timer = window.setTimeout(() => { toast.hidden = true; }, 2400);
+}
+
+function cashbookAccount(accountId) {
+  return state.cashbook.accounts.find((account) => account.id === accountId) || null;
+}
+
+function cashbookEvent(eventId) {
+  return state.cashbook.ledger.find((row) => row.id === eventId) || null;
+}
+
+async function loadCashbook() {
+  if (state.cashbook.loading) return;
+  state.cashbook.loading = true;
+  byId("cashbook-day-hint").textContent = "正在讀取日常帳本…";
+  try {
+    await cashbookRpc("cashbook_ensure_defaults");
+    const { start, end } = cashbookMonthBounds(state.cashbook.month);
+    const [accountRows, balanceRows, categories, ledger, events] = await Promise.all([
+      fetchAll("cashbook_accounts?select=*&order=status.asc,name.asc"),
+      fetchAll("cashbook_account_balances?select=*&order=status.asc,name.asc"),
+      fetchAll("cashbook_categories?select=*&order=category_type.asc,sort_order.asc,name.asc"),
+      fetchAll(`cashbook_ledger?select=*&occurred_on=gte.${start}&occurred_on=lt.${end}&order=occurred_on.desc,created_at.desc&limit=500`),
+      fetchAll(`cashbook_events?select=id,source_payload&occurred_on=gte.${start}&occurred_on=lt.${end}&order=occurred_on.desc,created_at.desc&limit=500`)
+    ]);
+    const balanceById = new Map(balanceRows.map((row) => [row.account_id, row]));
+    const payloadById = new Map(events.map((row) => [row.id, row.source_payload || {}]));
+    state.cashbook.accounts = accountRows.map((row) => ({
+      ...row,
+      balance: balanceById.get(row.id)?.balance ?? 0,
+      last_event_on: balanceById.get(row.id)?.last_event_on ?? null
+    }));
+    state.cashbook.categories = categories;
+    state.cashbook.ledger = ledger.map((row) => ({ ...row, source_payload: payloadById.get(row.id) || {} }));
+    state.cashbook.events = events;
+    state.cashbook.loaded = true;
+    renderCashbook();
+  } catch (error) {
+    byId("cashbook-day-hint").textContent = error instanceof Error ? `讀取失敗：${error.message}` : "日常帳本讀取失敗";
+  } finally {
+    state.cashbook.loading = false;
+  }
+}
+
+function renderCashbookAccounts() {
+  const strip = byId("cashbook-account-strip");
+  strip.replaceChildren();
+  const accounts = state.cashbook.accounts.filter((row) => row.status === "active" && row.account_type !== "investment_bridge");
+  if (!accounts.length) {
+    strip.innerHTML = '<div class="empty-state">尚未建立日常帳戶，請先在桌面版建立帳戶。</div>';
+    return;
+  }
+  for (const account of accounts) {
+    const card = document.createElement("article");
+    card.className = `cashbook-account-card ${account.account_type === "asset_cost" ? "is-asset-cost" : ""}`;
+    const accountKind = account.account_type === "asset_cost"
+      ? cashbookAssetClassLabels[account.asset_class] || "資產成本"
+      : cashbookAccountTypeLabels[account.account_type] || account.account_type;
+    card.innerHTML = `<span>${escapeHtml(accountKind)}</span><strong>${escapeHtml(account.name)}</strong><b class="private-number">${cashbookMoney(account.balance, account.currency)}</b>`;
+    strip.append(card);
+  }
+}
+
+function renderCashbookCalendar() {
+  const [year, month] = state.cashbook.month.split("-").map(Number);
+  byId("cashbook-month-label").textContent = `${year} 年 ${month} 月`;
+  const grid = byId("cashbook-calendar-grid");
+  grid.replaceChildren();
+  const firstWeekday = new Date(year, month - 1, 1).getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const eventsByDate = new Map();
+  for (const row of state.cashbook.ledger.filter((item) => item.status === "posted")) {
+    const types = eventsByDate.get(row.occurred_on) || new Set();
+    types.add(row.event_type);
+    if (usdEquivalentCurrencies.has(row.original_currency) || usdEquivalentCurrencies.has(row.account_currency)) types.add("usd");
+    eventsByDate.set(row.occurred_on, types);
+  }
+  for (let index = 0; index < firstWeekday; index += 1) {
+    const spacer = document.createElement("span");
+    spacer.className = "calendar-spacer";
+    grid.append(spacer);
+  }
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const dateKey = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "cashbook-day-button";
+    button.dataset.cashbookDate = dateKey;
+    button.classList.toggle("is-selected", state.cashbook.selectedDate === dateKey);
+    button.classList.toggle("is-today", localDateKey() === dateKey);
+    button.setAttribute("aria-label", `${month} 月 ${day} 日`);
+    const markers = [...(eventsByDate.get(dateKey) || [])].slice(0, 4).map((type) => `<i class="is-${escapeHtml(type)}"></i>`).join("");
+    button.innerHTML = `<span>${day}</span><b>${markers}</b>`;
+    grid.append(button);
+  }
+}
+
+function cashbookEntryAmount(row) {
+  if (row.event_type === "expense") return cashbookMoney(-Math.abs(num(row.original_amount)), row.original_currency);
+  if (row.event_type === "income") return cashbookMoney(Math.abs(num(row.original_amount)), row.original_currency, true);
+  if (["transfer", "credit_card_payment", "investment_funding_transfer"].includes(row.event_type)) return cashbookMoney(row.source_amount ?? row.original_amount, row.account_currency);
+  if (row.event_type === "exchange") return `${cashbookMoney(row.source_amount, row.account_currency)} → ${cashbookMoney(row.destination_amount, cashbookAccount(row.destination_account_id)?.currency || row.original_currency)}`;
+  return cashbookMoney(row.destination_amount ?? row.original_amount, row.account_currency || row.original_currency);
+}
+
+function cashbookEntryDetail(row) {
+  const source = row.source_account_name || cashbookAccount(row.source_account_id)?.name;
+  const destination = row.destination_account_name || cashbookAccount(row.destination_account_id)?.name;
+  const accountPath = source && destination ? `${source} → ${destination}` : source || destination || "—";
+  const details = [accountPath, row.category_name].filter(Boolean);
+  if (row.event_type === "expense" && row.original_currency !== row.account_currency && row.source_amount) {
+    details.push(`實扣 ${cashbookMoney(row.source_amount, row.account_currency)}`);
+  }
+  if (num(row.rate_twd_per_usd) > 0) details.push(`1 ${row.account_currency === "TWD" ? row.original_currency : row.account_currency} = ${num(row.rate_twd_per_usd).toFixed(4)} TWD`);
+  return details.join(" · ");
+}
+
+function renderCashbookDay() {
+  const selectedDate = state.cashbook.selectedDate;
+  const list = byId("cashbook-entry-list");
+  list.replaceChildren();
+  if (!selectedDate) {
+    byId("cashbook-selected-date").textContent = "請選擇日期";
+    byId("cashbook-entry-count").textContent = "0";
+    list.innerHTML = '<div class="empty-state">點日曆中的日期查看帳目</div>';
+    return;
+  }
+  const date = new Date(`${selectedDate}T00:00:00`);
+  byId("cashbook-selected-date").textContent = new Intl.DateTimeFormat("zh-TW", { month: "long", day: "numeric", weekday: "short" }).format(date);
+  const rows = state.cashbook.ledger.filter((row) => row.status === "posted" && row.occurred_on === selectedDate);
+  byId("cashbook-entry-count").textContent = rows.length;
+  byId("cashbook-day-hint").textContent = state.cashbook.armedDate === selectedDate
+    ? "再點一次同一天可直接新增；也可以按右上角「記一筆」。"
+    : "第一次點日期只顯示當日紀錄。";
+  if (!rows.length) {
+    list.innerHTML = '<div class="empty-state">這一天還沒有帳目</div>';
+    return;
+  }
+  for (const row of rows) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "cashbook-entry-row";
+    item.dataset.cashbookEventId = row.id;
+    const label = cashbookTypeLabels[row.event_type] || row.event_type;
+    const merchant = row.merchant || row.category_name || label;
+    const tone = row.event_type === "expense" ? "is-expense" : row.event_type === "income" ? "is-income" : "is-transfer";
+    item.innerHTML = `<span class="cashbook-entry-type ${tone}">${escapeHtml(label)}</span><span class="cashbook-entry-copy"><strong>${escapeHtml(merchant)}</strong><small>${escapeHtml(cashbookEntryDetail(row))}</small></span><span class="cashbook-entry-value private-number">${escapeHtml(cashbookEntryAmount(row))}<small>點擊修改</small></span>`;
+    list.append(item);
+  }
+}
+
+function renderCashbook() {
+  renderCashbookAccounts();
+  renderCashbookCalendar();
+  renderCashbookDay();
+}
+
+function shiftCashbookMonth(offset) {
+  const [year, month] = state.cashbook.month.split("-").map(Number);
+  const shifted = new Date(year, month - 1 + offset, 1);
+  state.cashbook.month = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, "0")}`;
+  state.cashbook.selectedDate = `${state.cashbook.month}-01`;
+  state.cashbook.armedDate = "";
+  void loadCashbook();
+}
+
+function setCashbookFieldVisible(fieldId, visible) {
+  byId(fieldId).hidden = !visible;
+}
+
+function addAccountOptions(select, groups, selectedValue = "") {
+  select.replaceChildren();
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "請選擇";
+  select.append(placeholder);
+  for (const group of groups) {
+    if (!group.accounts.length) continue;
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = group.label;
+    for (const account of group.accounts) {
+      const option = document.createElement("option");
+      option.value = account.id;
+      option.textContent = `${account.name} · ${account.currency}`;
+      option.selected = account.id === selectedValue;
+      optgroup.append(option);
+    }
+    select.append(optgroup);
+  }
+}
+
+function refreshCashbookForm({ rebuildOptions = false } = {}) {
+  const mode = byId("cashbook-event-type").value;
+  const sourceSelect = byId("cashbook-source-account");
+  const destinationSelect = byId("cashbook-destination-account");
+  const categorySelect = byId("cashbook-category");
+  const accounts = state.cashbook.accounts.filter((row) => row.status === "active" && row.account_type !== "investment_bridge");
+  const general = accounts.filter((row) => ["cash", "bank", "electronic_payment", "debit_card"].includes(row.account_type));
+  const credit = accounts.filter((row) => row.account_type === "credit_card");
+  const asset = accounts.filter((row) => row.account_type === "asset_cost");
+  if (rebuildOptions) {
+    const sourceValue = sourceSelect.value || state.cashbook.editingEvent?.source_account_id || "";
+    const destinationValue = destinationSelect.value || state.cashbook.editingEvent?.destination_account_id || "";
+    const sourceGroups = mode === "investment_funding_transfer" ? [{ label: "一般資金帳戶", accounts: general }]
+      : mode === "transfer" ? [{ label: "一般資金帳戶", accounts: general }]
+      : [{ label: "一般資金帳戶", accounts: general }, { label: "信用卡（負債）", accounts: credit }];
+    const destinationGroups = mode === "investment_funding_transfer" ? [{ label: "資產成本帳戶", accounts: asset }]
+      : mode === "opening_balance" ? [{ label: "一般資金帳戶", accounts: general }, { label: "信用卡（負債）", accounts: credit }, { label: "資產成本帳戶", accounts: asset }]
+      : mode === "income" ? [{ label: "一般資金帳戶", accounts: general }]
+      : [{ label: "一般資金帳戶", accounts: general }, { label: "信用卡（負債）", accounts: credit }];
+    addAccountOptions(sourceSelect, sourceGroups, sourceValue);
+    addAccountOptions(destinationSelect, destinationGroups, destinationValue);
+    const categoryType = mode === "expense" ? "expense" : mode === "income" ? "income" : mode === "investment_funding_transfer" ? "balance" : "";
+    const currentCategory = categorySelect.value || state.cashbook.editingEvent?.category_id || "";
+    categorySelect.replaceChildren();
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = categoryType ? "請選擇品類" : "不適用";
+    categorySelect.append(empty);
+    const categories = state.cashbook.categories.filter((row) => row.status === "active" && row.category_type === categoryType && (mode !== "investment_funding_transfer" || row.name === "資產投入"));
+    for (const category of categories) {
+      const option = document.createElement("option");
+      option.value = category.id;
+      option.textContent = category.name;
+      option.selected = category.id === currentCategory;
+      categorySelect.append(option);
+    }
+    if (mode === "investment_funding_transfer" && categories.length === 1) categorySelect.value = categories[0].id;
+  }
+  const source = cashbookAccount(sourceSelect.value);
+  const destination = cashbookAccount(destinationSelect.value);
+  const isExpense = mode === "expense";
+  const isIncome = mode === "income";
+  const isTransfer = mode === "transfer";
+  const isFunding = mode === "investment_funding_transfer";
+  const isOpening = mode === "opening_balance";
+  const selectedAccount = isExpense ? source : isIncome || isOpening ? destination : null;
+  const originalCurrency = byId("cashbook-original-currency").value;
+  const crossCurrency = isTransfer && source && destination && source.currency !== destination.currency;
+  const differentCurrency = (isExpense || isIncome) && selectedAccount && originalCurrency !== selectedAccount.currency;
+  const isProperty = isFunding && destination?.asset_class === "real_estate";
+  const existingProperty = Boolean(state.cashbook.editingEvent?.source_payload?.property_related);
+
+  setCashbookFieldVisible("cashbook-merchant-field", isExpense || isIncome || isFunding);
+  setCashbookFieldVisible("cashbook-source-field", isExpense || isTransfer || isFunding);
+  setCashbookFieldVisible("cashbook-destination-field", isIncome || isTransfer || isOpening || isFunding);
+  setCashbookFieldVisible("cashbook-category-field", isExpense || isIncome || isFunding);
+  setCashbookFieldVisible("cashbook-recovery-field", isProperty || (existingProperty && !isIncome));
+  setCashbookFieldVisible("cashbook-currency-field", isExpense || isIncome);
+  setCashbookFieldVisible("cashbook-settled-field", Boolean(differentCurrency));
+  setCashbookFieldVisible("cashbook-received-field", Boolean(crossCurrency));
+  setCashbookFieldVisible("cashbook-fee-toggle-field", !isOpening);
+  setCashbookFieldVisible("cashbook-fee-field", !isOpening && byId("cashbook-has-fee").checked);
+  byId("cashbook-merchant-label").textContent = isExpense ? "商家／對象" : isIncome ? "收入來源／對象" : "資產／標的（選填）";
+  byId("cashbook-source-label").textContent = isExpense ? "付款帳戶" : isFunding ? "資金來源帳戶" : "轉出帳戶";
+  byId("cashbook-destination-label").textContent = isIncome ? "入帳帳戶" : isOpening ? "初始化帳戶" : isFunding ? "資產成本帳戶" : "轉入帳戶";
+  byId("cashbook-amount-label").textContent = isFunding ? `投入金額${source ? `（${source.currency}）` : ""}` : isTransfer ? `轉出金額${source ? `（${source.currency}）` : ""}` : isOpening ? `初始化金額${destination ? `（${destination.currency}）` : ""}` : `${isExpense && originalCurrency === "TWD" && usdEquivalentCurrencies.has(source?.currency) ? "現場消費" : isExpense ? "消費" : "收入"}金額（${originalCurrency}）`;
+  byId("cashbook-settled-label").textContent = `${isExpense ? source?.account_type === "credit_card" ? "信用卡" : "帳戶" : "帳戶"}實際${isExpense ? "扣款" : "入帳"}（${selectedAccount?.currency || ""}）`;
+  byId("cashbook-received-label").textContent = `轉入實收（${destination?.currency || ""}）`;
+
+  const amount = num(byId("cashbook-original-amount").value);
+  const settled = num(byId("cashbook-settled-amount").value);
+  const received = num(byId("cashbook-received-amount").value);
+  const fee = byId("cashbook-has-fee").checked ? num(byId("cashbook-fee-amount").value) : 0;
+  let title = "選擇帳戶並輸入金額後自動計算";
+  let note = "交易匯率與有效匯率不需要手動輸入。";
+  if (crossCurrency && amount > 0 && received > 0) {
+    const rate = source.currency === "TWD" ? amount / received : destination.currency === "TWD" ? received / amount : received / amount;
+    title = source.currency === "TWD" || destination.currency === "TWD" ? `本筆換匯 · 1 ${source.currency === "TWD" ? destination.currency : source.currency} = ${rate.toFixed(4)} TWD` : `兌換比率 · 1 ${source.currency} = ${rate.toFixed(4)} ${destination.currency}`;
+    note = source.currency === "TWD" ? `含費用有效匯率 ${((amount + fee) / received).toFixed(4)} TWD。` : "兩端實際金額會保留，不以最新匯率回填。";
+  } else if (isExpense && differentCurrency && amount > 0 && settled > 0 && originalCurrency === "TWD" && usdEquivalentCurrencies.has(source?.currency)) {
+    title = `本筆刷卡匯率 · 1 ${source.currency} = ${(amount / settled).toFixed(4)} TWD`;
+    note = `${cashbookMoney(amount, "TWD")} ÷ ${cashbookMoney(settled, source.currency)}；${fee > 0 ? `含費用有效匯率 ${(amount / (settled + fee)).toFixed(4)} TWD。` : "由現場台幣金額與實扣外幣自動計算。"}`;
+  } else if ((isExpense || isIncome) && differentCurrency && amount > 0 && settled > 0 && selectedAccount?.currency === "TWD") {
+    title = `本筆交易匯率 · 1 ${originalCurrency} = ${(settled / amount).toFixed(4)} TWD`;
+    note = "依原始交易金額與帳戶實際入扣金額推導。";
+  } else if (isFunding && source && destination && amount > 0) {
+    title = `資產成本增加 ${cashbookMoney(amount, source.currency)}`;
+    note = isProperty ? byId("cashbook-property-recovery").value === "recoverable" ? "列為賣房時可回收本金。" : byId("cashbook-property-recovery").value === "non_recoverable" ? "列為費用／不保證回收成本。" : "請選擇房地產成本回收屬性。" : "不列入生活收入或支出。";
+  } else if (isOpening) {
+    title = "初始化只調整帳戶餘額";
+    note = "不列入收入、支出或消費趨勢。";
+  } else if (selectedAccount && amount > 0) {
+    title = `${isExpense ? "支出" : "收入"} ${cashbookMoney(amount, originalCurrency)}`;
+    note = differentCurrency ? "請再輸入帳戶實際入扣金額。" : "帳戶與交易幣別相同，不需要匯率。";
+  }
+  byId("cashbook-calculation-title").textContent = title;
+  byId("cashbook-calculation-note").textContent = note;
+}
+
+function openCashbookForm(existing = null, occurredOn = state.cashbook.selectedDate || localDateKey()) {
+  if (!state.cashbook.loaded) return;
+  state.cashbook.editingEvent = existing;
+  const form = byId("cashbook-form");
+  form.reset();
+  const initialMode = ["exchange", "credit_card_payment"].includes(existing?.event_type) ? "transfer" : existing?.event_type || "expense";
+  byId("cashbook-form-title").textContent = existing ? "編輯帳目" : "新增帳目";
+  byId("cashbook-event-type").value = initialMode;
+  byId("cashbook-occurred-on").value = existing?.occurred_on || occurredOn;
+  byId("cashbook-merchant").value = existing?.merchant || "";
+  byId("cashbook-original-currency").value = existing?.original_currency || "TWD";
+  byId("cashbook-original-amount").value = existing?.original_amount || "";
+  byId("cashbook-settled-amount").value = existing?.event_type === "expense" ? existing.source_amount || "" : existing?.event_type === "income" ? existing.destination_amount || "" : "";
+  byId("cashbook-received-amount").value = existing?.event_type === "exchange" ? existing.destination_amount || "" : "";
+  byId("cashbook-has-fee").checked = num(existing?.fee_amount) > 0;
+  byId("cashbook-fee-amount").value = existing?.fee_amount || 0;
+  byId("cashbook-note").value = existing?.note || "";
+  byId("cashbook-property-recovery").value = existing?.source_payload?.property_cost_recovery || "";
+  byId("cashbook-form-status").textContent = "";
+  byId("cashbook-void-button").hidden = !existing;
+  refreshCashbookForm({ rebuildOptions: true });
+  byId("cashbook-sheet").hidden = false;
+  document.body.classList.add("sheet-open");
+}
+
+function closeCashbookForm() {
+  byId("cashbook-sheet").hidden = true;
+  document.body.classList.remove("sheet-open");
+  state.cashbook.editingEvent = null;
+}
+
+async function saveCashbookEvent(event) {
+  event.preventDefault();
+  const existing = state.cashbook.editingEvent;
+  const mode = byId("cashbook-event-type").value;
+  const source = cashbookAccount(byId("cashbook-source-account").value);
+  const destination = cashbookAccount(byId("cashbook-destination-account").value);
+  const originalCurrency = byId("cashbook-original-currency").value;
+  const amount = num(byId("cashbook-original-amount").value);
+  const settled = num(byId("cashbook-settled-amount").value);
+  const received = num(byId("cashbook-received-amount").value);
+  const fee = byId("cashbook-has-fee").checked ? num(byId("cashbook-fee-amount").value) : 0;
+  const crossCurrency = mode === "transfer" && source && destination && source.currency !== destination.currency;
+  const storedType = mode === "transfer" ? crossCurrency ? "exchange" : destination?.account_type === "credit_card" ? "credit_card_payment" : "transfer" : mode;
+  const accountCurrency = source?.currency || destination?.currency || originalCurrency;
+  const storedOriginalCurrency = mode === "transfer" ? source?.currency : mode === "opening_balance" ? destination?.currency : originalCurrency;
+  const sourceAmount = mode === "expense" ? (originalCurrency === source?.currency ? amount : settled) : ["transfer", "investment_funding_transfer"].includes(mode) ? amount : null;
+  const destinationAmount = mode === "income" ? (originalCurrency === destination?.currency ? amount : settled) : mode === "opening_balance" ? amount : mode === "transfer" ? (crossCurrency ? received : amount) : mode === "investment_funding_transfer" ? amount : null;
+  const propertyRelated = mode === "investment_funding_transfer"
+    ? destination?.asset_class === "real_estate"
+    : Boolean(existing?.source_payload?.property_related);
+  const recovery = byId("cashbook-property-recovery").value;
+  const status = byId("cashbook-form-status");
+  if (!(amount > 0)) return void (status.textContent = "請輸入大於 0 的金額");
+  if (mode === "expense" && (!source || !byId("cashbook-category").value || !(sourceAmount > 0))) return void (status.textContent = "請選擇付款帳戶、支出品類並完成金額");
+  if (mode === "income" && (!destination || !byId("cashbook-category").value || !(destinationAmount > 0))) return void (status.textContent = "請選擇入帳帳戶、收入品類並完成金額");
+  if (mode === "transfer" && (!source || !destination || source.id === destination.id || !(destinationAmount > 0))) return void (status.textContent = "請選擇不同的轉出、轉入帳戶並完成金額");
+  if (mode === "investment_funding_transfer" && (!source || !destination || destination.account_type !== "asset_cost" || source.currency !== destination.currency || !byId("cashbook-category").value)) return void (status.textContent = "請選擇同幣別的資金來源與資產成本帳戶");
+  if (mode === "opening_balance" && !destination) return void (status.textContent = "請選擇初始化帳戶");
+  if ((mode === "expense" || mode === "income") && originalCurrency !== accountCurrency && !(settled > 0)) return void (status.textContent = `請輸入帳戶實際${mode === "expense" ? "扣款" : "入帳"}金額`);
+  if (crossCurrency && !(received > 0)) return void (status.textContent = "請輸入轉入帳戶實收金額");
+  if (propertyRelated && mode !== "income" && !recovery) return void (status.textContent = "請選擇房地產成本回收屬性");
+  const pooledCostFx = num(state.data?.pooledCostFx);
+  if (mode === "opening_balance" && usdEquivalentCurrencies.has(destination.currency) && destination.account_type !== "credit_card" && !(pooledCostFx > 0)) return void (status.textContent = `投資資料尚無美元成本，暫時無法初始化 ${destination.currency}`);
+  let rate = null;
+  let effectiveRate = null;
+  if ((mode === "expense" || mode === "income") && usdEquivalentCurrencies.has(originalCurrency) && accountCurrency === "TWD" && amount > 0 && settled > 0) {
+    rate = settled / amount;
+    effectiveRate = mode === "income" ? Math.max(settled - fee, 0) / amount : (settled + fee) / amount;
+  } else if (mode === "expense" && originalCurrency === "TWD" && usdEquivalentCurrencies.has(accountCurrency) && amount > 0 && settled > 0) {
+    rate = amount / settled;
+    effectiveRate = amount / (settled + fee);
+  }
+  const saveButton = byId("cashbook-save-button");
+  saveButton.disabled = true;
+  status.textContent = "儲存中…";
+  try {
+    const occurredOn = byId("cashbook-occurred-on").value;
+    await cashbookRpc("cashbook_event_save", {
+      p_id: existing?.id || null,
+      p_event_type: storedType,
+      p_occurred_on: occurredOn,
+      p_merchant: byId("cashbook-merchant").value.trim() || null,
+      p_category_id: ["expense", "income", "investment_funding_transfer"].includes(mode) ? byId("cashbook-category").value || null : null,
+      p_source_account_id: ["expense", "transfer", "investment_funding_transfer"].includes(mode) ? source?.id || null : null,
+      p_destination_account_id: ["income", "transfer", "opening_balance", "investment_funding_transfer"].includes(mode) ? destination?.id || null : null,
+      p_original_amount: amount,
+      p_original_currency: storedOriginalCurrency,
+      p_account_currency: accountCurrency,
+      p_source_amount: sourceAmount,
+      p_destination_amount: destinationAmount,
+      p_fee_amount: fee,
+      p_fee_currency: accountCurrency,
+      p_rate_twd_per_usd: rate,
+      p_effective_rate_twd_per_usd: effectiveRate,
+      p_fx_evidence_status: crossCurrency || ((mode === "expense" || mode === "income") && originalCurrency !== accountCurrency) ? "derived" : "missing",
+      p_twd_value: mode === "investment_funding_transfer" ? accountCurrency === "TWD" ? amount : pooledCostFx > 0 ? amount * pooledCostFx : null : mode === "expense" && originalCurrency === "TWD" && usdEquivalentCurrencies.has(accountCurrency) ? amount : null,
+      p_usd_cost_rate_twd_per_usd: mode === "opening_balance" && usdEquivalentCurrencies.has(destination?.currency) && destination?.account_type !== "credit_card" ? pooledCostFx : null,
+      p_usd_cost_twd: null,
+      p_realized_fx_pnl_twd: null,
+      p_investment_target: mode === "investment_funding_transfer" ? destination?.asset_class || null : null,
+      p_bridge_event_id: null,
+      p_note: byId("cashbook-note").value.trim() || null,
+      p_source_system: "dashboard_manual",
+      p_source_payload: {
+        ...(existing?.source_payload || {}),
+        ui: "investment_mobile",
+        property_related: propertyRelated,
+        property_cost_recovery: propertyRelated && mode !== "income" ? recovery : null
+      },
+      p_idempotency_key: existing?.idempotency_key || `mobile:${crypto.randomUUID()}`
+    });
+    state.cashbook.month = occurredOn.slice(0, 7);
+    state.cashbook.selectedDate = occurredOn;
+    state.cashbook.armedDate = "";
+    closeCashbookForm();
+    showToast(existing ? "帳目已更新" : "帳目已儲存");
+    await loadCashbook();
+  } catch (error) {
+    status.textContent = error instanceof Error ? `儲存失敗：${error.message}` : "儲存失敗";
+  } finally {
+    saveButton.disabled = false;
+  }
+}
+
+async function voidCashbookEvent() {
+  const existing = state.cashbook.editingEvent;
+  if (!existing || !window.confirm("確定作廢這筆帳目？帳目會保留稽核紀錄，但不再計入餘額。")) return;
+  const button = byId("cashbook-void-button");
+  button.disabled = true;
+  byId("cashbook-form-status").textContent = "處理中…";
+  try {
+    await cashbookRpc("cashbook_event_delete", { p_id: existing.id });
+    closeCashbookForm();
+    showToast("帳目已作廢");
+    await loadCashbook();
+  } catch (error) {
+    byId("cashbook-form-status").textContent = error instanceof Error ? `作廢失敗：${error.message}` : "作廢失敗";
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function renderPositions() {
   const rows = state.data.positions.filter((row) => state.marketFilter === "all" || row.assetClass === state.marketFilter);
   byId("position-count").textContent = rows.length;
@@ -740,6 +1248,7 @@ function showTab(tabName) {
   state.activeTab = tabName;
   document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.tab === tabName));
   document.querySelectorAll(".tab-panel").forEach((panel) => { panel.hidden = panel.dataset.panel !== tabName; });
+  if (tabName === "cashbook" && !state.cashbook.loaded && !state.cashbook.loading) void loadCashbook();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -802,6 +1311,25 @@ byId("clear-transaction-search").addEventListener("click", () => {
 });
 
 document.addEventListener("click", (event) => {
+  const calendarDate = event.target.closest("[data-cashbook-date]");
+  if (calendarDate) {
+    const dateKey = calendarDate.dataset.cashbookDate;
+    if (state.cashbook.selectedDate === dateKey && state.cashbook.armedDate === dateKey) {
+      openCashbookForm(null, dateKey);
+    } else {
+      state.cashbook.selectedDate = dateKey;
+      state.cashbook.armedDate = dateKey;
+      renderCashbookCalendar();
+      renderCashbookDay();
+    }
+    return;
+  }
+  const cashbookRow = event.target.closest("[data-cashbook-event-id]");
+  if (cashbookRow) {
+    const record = cashbookEvent(cashbookRow.dataset.cashbookEventId);
+    if (record) openCashbookForm(record, record.occurred_on);
+    return;
+  }
   const button = event.target.closest("[data-asset-ledger]");
   if (!button) return;
   state.transactionAssetId = button.dataset.assetLedger || "";
@@ -814,11 +1342,35 @@ document.addEventListener("click", (event) => {
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 
-refreshButton.addEventListener("click", loadDashboard);
+byId("cashbook-prev-month").addEventListener("click", () => shiftCashbookMonth(-1));
+byId("cashbook-next-month").addEventListener("click", () => shiftCashbookMonth(1));
+byId("cashbook-add-button").addEventListener("click", () => openCashbookForm());
+byId("cashbook-close-button").addEventListener("click", closeCashbookForm);
+byId("cashbook-sheet").addEventListener("click", (event) => { if (event.target === byId("cashbook-sheet")) closeCashbookForm(); });
+byId("cashbook-form").addEventListener("submit", saveCashbookEvent);
+byId("cashbook-void-button").addEventListener("click", voidCashbookEvent);
+byId("cashbook-event-type").addEventListener("change", () => refreshCashbookForm({ rebuildOptions: true }));
+byId("cashbook-source-account").addEventListener("change", () => {
+  const source = cashbookAccount(byId("cashbook-source-account").value);
+  if (!state.cashbook.editingEvent && byId("cashbook-event-type").value === "expense" && source) {
+    byId("cashbook-original-currency").value = usdEquivalentCurrencies.has(source.currency) ? "TWD" : source.currency;
+  }
+  refreshCashbookForm();
+});
+for (const id of ["cashbook-destination-account", "cashbook-category", "cashbook-property-recovery", "cashbook-original-currency", "cashbook-original-amount", "cashbook-settled-amount", "cashbook-received-amount", "cashbook-has-fee", "cashbook-fee-amount"]) {
+  byId(id).addEventListener("change", () => refreshCashbookForm());
+  byId(id).addEventListener("input", () => refreshCashbookForm());
+}
+
+refreshButton.addEventListener("click", () => state.activeTab === "cashbook" ? loadCashbook() : loadDashboard());
 byId("retry-button").addEventListener("click", loadDashboard);
 byId("sign-out-button").addEventListener("click", () => {
   clearSession();
   state.data = null;
+  state.cashbook.loaded = false;
+  state.cashbook.accounts = [];
+  state.cashbook.categories = [];
+  state.cashbook.ledger = [];
   showLogin();
 });
 byId("privacy-toggle").addEventListener("click", () => {
