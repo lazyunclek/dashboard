@@ -286,7 +286,7 @@
           <label id="cashbook-currency-field"><span>現場交易幣別</span><select id="cashbook-original-currency">
             <option value="TWD">TWD</option><option value="USD">USD</option><option value="USDC">USDC</option><option value="USDT">USDT</option>
           </select></label>
-          <label><span id="cashbook-amount-label">金額（TWD）</span><input id="cashbook-original-amount" type="number" min="0" step="0.01" inputmode="decimal" required></label>
+          <label class="cashbook-amount-field"><span id="cashbook-amount-label">金額（TWD）</span><input id="cashbook-original-amount" type="number" min="0" step="0.01" inputmode="decimal" required placeholder="0"></label>
           <label id="cashbook-settled-field" hidden><span id="cashbook-settled-label">帳戶實際扣款</span><input id="cashbook-settled-amount" type="number" min="0" step="0.01" inputmode="decimal"></label>
           <label id="cashbook-received-field" hidden><span id="cashbook-received-label">轉入帳戶實收</span><input id="cashbook-received-amount" type="number" min="0" step="0.01" inputmode="decimal"></label>
           <label id="cashbook-fee-toggle-field" class="cashbook-check-field"><span>手續費</span><span class="cashbook-check-row"><input id="cashbook-has-fee" type="checkbox"><span>這筆交易另有手續費</span></span></label>

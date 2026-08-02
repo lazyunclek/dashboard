@@ -37,7 +37,8 @@ const state = {
     editingEvent: null
   },
   numbersHidden: window.localStorage.getItem(storageKeys.privacy) === "true",
-  loading: false
+  loading: false,
+  sheetScrollY: 0
 };
 
 const byId = (id) => document.getElementById(id);
@@ -459,19 +460,53 @@ function buildDashboard(raw) {
 
   const investablePositions = positions.filter((row) => !row.excluded);
   const openPositions = investablePositions.filter((row) => Math.abs(row.quantity) > 1e-10);
-  const cashComponents = components.filter((row) => row.component_type === "cash" && row.source_system === "dashboard_manual_cash");
-  const cashValueTwd = cashComponents.reduce((sum, row) => {
-    if (row.native_currency === "TWD") return sum + num(row.quantity ?? row.net_value_twd ?? row.gross_value_twd);
-    return sum + num(row.quantity) * currentFx;
-  }, 0);
-  const cashCostTwd = cashComponents.reduce((sum, row) => sum + (row.native_currency === "TWD" ? num(row.quantity ?? row.cost_twd) : num(row.quantity) * pooledCostFx), 0);
-  const cashCurrencies = cashComponents
-    .filter((row) => Math.abs(num(row.quantity ?? row.net_value_twd ?? row.gross_value_twd)) > 1e-10)
-    .map((row) => String(row.native_currency || "").toUpperCase())
-    .filter(Boolean);
+  const eligibleCashTypes = new Set(["cash", "bank", "electronic_payment", "debit_card", "credit_card"]);
+  const activeCashbookBalances = (raw.cashbookBalances || []).filter((row) => row.status === "active" && eligibleCashTypes.has(row.account_type));
+  const cashBalances = ["TWD", "USD", "USDC", "USDT"].map((currency) => {
+    const rows = activeCashbookBalances.filter((row) => row.currency === currency && (currency !== "USD" || row.use_as_investment_usd_source));
+    const balance = rows.reduce((sum, row) => sum + num(row.balance), 0);
+    const factor = currency === "TWD" ? 1 : currentFx;
+    const costFactor = currency === "TWD" ? 1 : pooledCostFx;
+    return { currency, balance, valueTwd: balance * factor, costTwd: balance * costFactor };
+  });
+  const cashValueTwd = cashBalances.reduce((sum, row) => sum + row.valueTwd, 0);
+  const cashCostTwd = cashBalances.reduce((sum, row) => sum + row.costTwd, 0);
+  const cashCurrencies = cashBalances.filter((row) => Math.abs(row.balance) > 1e-10).map((row) => row.currency);
 
   const propertyComponents = components.filter((row) => row.component_type === "property" && row.included_in_total);
-  const propertyValueTwd = propertyComponents.reduce((sum, row) => sum + num(row.net_value_twd), 0);
+  const propertyComponent = propertyComponents[0] || null;
+  const propertyAccounts = (raw.cashbookBalances || []).filter((row) => row.status === "active" && row.account_type === "asset_cost" && row.asset_class === "real_estate" && row.currency === "TWD");
+  const propertyAccountIds = new Set(propertyAccounts.map((row) => row.account_id).filter(Boolean));
+  const propertyEvents = (raw.cashbookEvents || []).filter((row) => row.status === "posted");
+  const propertyAssetCostTwd = propertyAccounts.reduce((sum, row) => sum + num(row.balance), 0);
+  const propertyExpenseCostTwd = propertyEvents
+    .filter((row) => row.event_type === "expense" && row.source_payload?.property_related)
+    .reduce((sum, row) => sum + num(row.twd_value ?? (row.original_currency === "TWD" ? row.original_amount : 0)), 0);
+  const propertyCashbookCostTwd = propertyAssetCostTwd + propertyExpenseCostTwd;
+  const classifiedPropertyAmount = (recovery) => propertyEvents
+    .filter((row) => row.source_payload?.property_cost_recovery === recovery
+      && (propertyAccountIds.has(row.destination_account_id) || (row.event_type === "expense" && row.source_payload?.property_related)))
+    .reduce((sum, row) => sum + num(row.event_type === "expense" ? row.twd_value ?? (row.original_currency === "TWD" ? row.original_amount : 0) : row.destination_amount ?? row.original_amount), 0);
+  let propertyRecoverableTwd = Math.min(classifiedPropertyAmount("recoverable"), propertyCashbookCostTwd);
+  let propertyNonRecoverableTwd = Math.min(classifiedPropertyAmount("non_recoverable"), Math.max(propertyCashbookCostTwd - propertyRecoverableTwd, 0));
+  let propertyRecoveryRoomTwd = Math.max(propertyCashbookCostTwd - propertyRecoverableTwd - propertyNonRecoverableTwd, 0);
+  for (const row of (raw.propertyEvents || []).filter((item) => ["recoverable", "non_recoverable"].includes(item.recovery_class))) {
+    const amount = Math.min(num(row.amount_twd), propertyRecoveryRoomTwd);
+    if (row.recovery_class === "recoverable") propertyRecoverableTwd += amount;
+    else propertyNonRecoverableTwd += amount;
+    propertyRecoveryRoomTwd -= amount;
+  }
+  const propertyModel = propertyComponent?.metadata?.valuation_model || null;
+  const propertySalePriceTwd = num(propertyModel?.future_sale_total_twd);
+  const propertyPurchasePriceTwd = num(propertyModel?.purchase_total_twd);
+  const propertyTaxRate = num(propertyModel?.sale_tax_rate ?? (1 - num(propertyModel?.sale_profit_retention_rate ?? 0.55)));
+  const propertyEstimatedTaxTwd = Math.max(propertySalePriceTwd - propertyPurchasePriceTwd, 0) * propertyTaxRate;
+  const propertyEstimatedProfitTwd = propertyModel
+    ? propertySalePriceTwd - propertyPurchasePriceTwd - propertyEstimatedTaxTwd
+    : num(propertyComponent?.unrealized_pnl_twd);
+  const propertyValueTwd = propertyComponent
+    ? propertyRecoverableTwd + propertyEstimatedProfitTwd
+    : 0;
 
   const runningGrids = gridRecords.filter((row) => row.record_state === "running");
   const closedGrids = gridRecords.filter((row) => row.record_state === "closed");
@@ -507,7 +542,7 @@ function buildDashboard(raw) {
       realizedPnlTwd: sumPositions(classes.crypto, "realizedPnlTwd") + gridPnlUsd * pooledCostFx,
       incomeTwd: sumPositions(classes.crypto, "incomeTwd")
     },
-    { key: "property", name: "房地產", valueTwd: propertyValueTwd, costTwd: propertyComponents.reduce((sum, row) => sum + num(row.cost_twd), 0), realizedPnlTwd: 0, incomeTwd: 0 }
+    { key: "property", name: "房地產", valueTwd: propertyValueTwd, costTwd: propertyCashbookCostTwd, realizedPnlTwd: 0, incomeTwd: 0 }
   ].map((group) => ({ ...group, unrealizedPnlTwd: group.valueTwd - group.costTwd }));
 
   const financialGroups = groups.filter((group) => group.key !== "property");
@@ -568,15 +603,18 @@ async function loadDashboard() {
     const portfolioId = portfolios[0]?.id;
     if (!portfolioId) throw new Error("這個帳號沒有可用的投資組合");
     const filter = `portfolio_id=eq.${encodeURIComponent(portfolioId)}`;
-    const [assets, transactions, incomeEvents, components, gridRecords] = await Promise.all([
+    const [assets, transactions, incomeEvents, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents] = await Promise.all([
       fetchAll(`investment_assets?select=id,portfolio_id,symbol,name,asset_class,market,quote_currency,quantity_unit,quantity_scale,price_scale,amount_scale,metadata&${filter}&order=symbol.asc`),
       fetchAll(`investment_transactions?select=id,portfolio_id,account_id,asset_id,transaction_type,trade_date,quantity,unit_price,gross_amount,fee_amount,tax_amount,net_cash_amount,settlement_currency,status,details,created_at,updated_at&status=neq.voided&${filter}&order=trade_date.desc,created_at.desc`),
       fetchAll(`investment_income_events?select=id,portfolio_id,account_id,asset_id,income_type,event_date,gross_amount,withholding_tax,fee_amount,net_amount,currency,status,details,created_at,updated_at&status=neq.voided&${filter}&order=event_date.desc,created_at.desc`),
       fetchAll(`investment_portfolio_component_values?select=id,portfolio_id,component_key,component_type,asset_class,market,symbol,name,quantity,quantity_unit,native_currency,latest_price,cost_twd,gross_value_twd,liability_twd,net_value_twd,realized_pnl_twd,unrealized_pnl_twd,income_twd,included_in_total,included_in_financial,source_system,source_updated_at,data_status,metadata&${filter}&order=component_key.asc`),
-      fetchAll(`investment_grid_records?select=id,portfolio_id,record_state,symbol,status,investment_usdt,realized_pnl,source_updated_at&${filter}&order=source_updated_at.desc`)
+      fetchAll(`investment_grid_records?select=id,portfolio_id,record_state,symbol,status,investment_usdt,realized_pnl,source_updated_at&${filter}&order=source_updated_at.desc`),
+      fetchAll("cashbook_account_balances?select=account_id,account_type,currency,asset_class,balance,status,use_as_investment_usd_source"),
+      fetchAll("cashbook_events?select=id,event_type,original_amount,original_currency,destination_account_id,destination_amount,twd_value,source_payload,status"),
+      fetchAll(`investment_property_events?select=property_component_id,amount_twd,recovery_class&${filter}`)
     ]);
     const marketPrices = await fetchLatestMarketPrices(assets, portfolioId);
-    state.data = buildDashboard({ portfolios, assets, transactions, incomeEvents, marketPrices, components, gridRecords });
+    state.data = buildDashboard({ portfolios, assets, transactions, incomeEvents, marketPrices, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents });
     renderDashboard();
   } catch (error) {
     byId("error-message").textContent = error instanceof Error ? error.message : String(error);
@@ -1032,12 +1070,16 @@ function openCashbookForm(existing = null, occurredOn = state.cashbook.selectedD
   byId("cashbook-void-button").hidden = !existing;
   refreshCashbookForm({ rebuildOptions: true });
   byId("cashbook-sheet").hidden = false;
+  state.sheetScrollY = window.scrollY;
+  document.body.style.top = `-${state.sheetScrollY}px`;
   document.body.classList.add("sheet-open");
 }
 
 function closeCashbookForm() {
   byId("cashbook-sheet").hidden = true;
   document.body.classList.remove("sheet-open");
+  document.body.style.top = "";
+  window.scrollTo({ top: state.sheetScrollY, behavior: "auto" });
   state.cashbook.editingEvent = null;
 }
 
