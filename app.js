@@ -171,6 +171,14 @@ function money(value, currency = "TWD", signed = false) {
   return `${prefix}${currency === "TWD" ? "NT$" : currency + " "}${formatted}`;
 }
 
+function overviewMoney(value, signed = false) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
+  const amount = Number(value);
+  const formatted = new Intl.NumberFormat("zh-TW", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Math.abs(amount));
+  const prefix = signed ? (amount > 0 ? "+" : amount < 0 ? "−" : "") : (amount < 0 ? "−" : "");
+  return `${prefix}NT$${formatted}`;
+}
+
 function perSharePrice(value, currency, assetClass) {
   if (value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
   const amount = Number(value);
@@ -384,6 +392,7 @@ function buildDashboard(raw) {
       marketValueNative,
       marketValueTwd,
       unrealizedPnlTwd: marketValueTwd === null ? null : marketValueTwd - costTwd,
+      fxPnlTwd: tradeCurrency === "TWD" ? 0 : ledger.remainingCost * (currentFx - pooledCostFx),
       unrealizedPnlPct: marketValueTwd === null || costTwd <= 0 ? null : (marketValueTwd - costTwd) / costTwd * 100,
       realizedPnlTwd,
       incomeTwd,
@@ -446,6 +455,7 @@ function buildDashboard(raw) {
       marketValueNative: null,
       marketValueTwd: currentValue,
       unrealizedPnlTwd: currentValue - costTwd,
+      fxPnlTwd: component.native_currency === "TWD" || pooledCostFx <= 0 ? 0 : costTwd / pooledCostFx * (currentFx - pooledCostFx),
       unrealizedPnlPct: costTwd > 0 ? (currentValue - costTwd) / costTwd * 100 : null,
       realizedPnlTwd: num(component.realized_pnl_twd),
       incomeTwd: num(component.income_twd),
@@ -539,11 +549,18 @@ function buildDashboard(raw) {
       name: "加密資產",
       valueTwd: sumPositions(classes.crypto, "marketValueTwd", true) + gridValueTwd,
       costTwd: sumPositions(classes.crypto, "costTwd", true) + gridCostTwd,
-      realizedPnlTwd: sumPositions(classes.crypto, "realizedPnlTwd") + gridPnlUsd * pooledCostFx,
+      realizedPnlTwd: sumPositions(classes.crypto, "realizedPnlTwd"),
       incomeTwd: sumPositions(classes.crypto, "incomeTwd")
     },
     { key: "property", name: "房地產", valueTwd: propertyValueTwd, costTwd: propertyCashbookCostTwd, realizedPnlTwd: 0, incomeTwd: 0 }
-  ].map((group) => ({ ...group, unrealizedPnlTwd: group.valueTwd - group.costTwd }));
+  ].map((group) => {
+    const unrealizedPnlTwd = group.key === "property" ? propertyEstimatedProfitTwd : group.valueTwd - group.costTwd;
+    return {
+      ...group,
+      unrealizedPnlTwd,
+      totalPnlTwd: group.realizedPnlTwd + group.incomeTwd + unrealizedPnlTwd
+    };
+  });
 
   const financialGroups = groups.filter((group) => group.key !== "property");
   const financialAssetsTwd = financialGroups.reduce((sum, group) => sum + group.valueTwd, 0);
@@ -561,6 +578,7 @@ function buildDashboard(raw) {
     return [assetClass, times.at(-1) || null];
   }));
   const stalePriceCount = openPositions.filter((row) => row.marketPriceStatus === "stale").length;
+  const usdFxPnlTwd = investablePositions.reduce((sum, row) => sum + num(row.fxPnlTwd), 0) + (cashValueTwd - cashCostTwd);
 
   return {
     portfolio,
@@ -576,6 +594,8 @@ function buildDashboard(raw) {
     runningGridPnlUsd,
     currentFx,
     pooledCostFx,
+    usdFxPnlTwd,
+    usdFxUpdatedAt: fxRow?.price_at || fxRow?.fetched_at || null,
     financialAssetsTwd,
     financialCostTwd,
     totalAssetsTwd,
@@ -1269,18 +1289,24 @@ function renderOverview() {
   ].filter(([, value]) => value).map(([label, value]) => `${label} ${dateTime(value)}`);
   byId("data-updated-at").textContent = `${marketLabels.join(" · ")}${data.stalePriceCount ? ` · ${data.stalePriceCount} 檔過期` : ""}`;
   byId("user-email").textContent = state.userEmail || "已登入";
-  byId("total-assets").textContent = money(data.totalAssetsTwd);
-  byId("total-assets-note").textContent = data.propertyValueTwd > 0 ? `含房地產淨值 ${money(data.propertyValueTwd)}` : "目前未納入房地產淨值";
-  byId("financial-assets").textContent = money(data.financialAssetsTwd);
-  byId("financial-cost-note").textContent = `成本 ${money(data.financialCostTwd)}`;
-  byId("unrealized-pnl").textContent = money(data.unrealizedPnlTwd, "TWD", true);
-  setTone(byId("unrealized-pnl"), data.unrealizedPnlTwd);
-  byId("unrealized-pct").textContent = data.unrealizedPnlPct === null ? "—" : `${data.unrealizedPnlPct >= 0 ? "+" : ""}${data.unrealizedPnlPct.toFixed(2)}%`;
-  byId("realized-pnl").textContent = money(data.realizedPnlTwd, "TWD", true);
-  setTone(byId("realized-pnl"), data.realizedPnlTwd);
-  byId("income-total").textContent = money(data.incomeTwd, "TWD", true);
-  setTone(byId("income-total"), data.incomeTwd);
-  byId("income-count").textContent = `${data.incomeEvents.length} 筆收益事件`;
+  byId("total-assets").textContent = overviewMoney(data.totalAssetsTwd);
+  byId("total-assets-note").textContent = "四類資產合計";
+  const overviewGroups = Object.fromEntries(data.groups.map((group) => [group.key, group]));
+  for (const [key, valueId, noteId] of [
+    ["traditional", "traditional-assets", "traditional-pnl-note"],
+    ["cash", "cash-assets", "cash-pnl-note"],
+    ["crypto", "crypto-assets", "crypto-pnl-note"],
+    ["property", "property-assets", "property-pnl-note"]
+  ]) {
+    const group = overviewGroups[key];
+    byId(valueId).textContent = overviewMoney(group?.valueTwd || 0);
+    byId(noteId).textContent = `累積總損益 ${overviewMoney(group?.totalPnlTwd || 0, true)}`;
+    setTone(byId(noteId), group?.totalPnlTwd || 0);
+  }
+  byId("usd-fx-rate").textContent = `${data.currentFx.toFixed(2)} TWD / USD`;
+  byId("usd-fx-note").textContent = `匯兌損益 ${overviewMoney(data.usdFxPnlTwd, true)}`;
+  setTone(byId("usd-fx-note"), data.usdFxPnlTwd);
+  byId("usd-fx-time").textContent = data.usdFxUpdatedAt ? `行情時間 ${dateTime(data.usdFxUpdatedAt)}` : "行情時間待同步";
   byId("current-cash").textContent = money(data.cashValueTwd);
   byId("current-cash-note").textContent = data.cashCurrencies.length ? data.cashCurrencies.join(" · ") : "尚未填寫目前現金";
   byId("running-grid-count").textContent = data.runningGridCount ? `${data.runningGridCount} 組` : "目前沒有";

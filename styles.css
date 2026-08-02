@@ -227,6 +227,14 @@ input::placeholder { color: #53645a; }
 .metric-card { min-width: 0; padding: 17px; border-radius: 15px; }
 .metric-card strong { display: block; margin-top: 9px; overflow-wrap: anywhere; font: 700 clamp(15px, 4.5vw, 21px)/1.25 var(--mono); }
 .metric-card small { display: block; margin-top: 7px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+.overview-metric-grid .metric-card:not(.metric-card-wide) > strong { overflow: hidden; font-size: clamp(12px, 3.45vw, 15px); letter-spacing: -0.035em; text-overflow: clip; white-space: nowrap; }
+.overview-metric-grid .metric-card:not(.metric-card-wide) > small { font-size: 8.5px; }
+.metric-card-wide { grid-column: 1 / -1; }
+.fx-metric-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: end; }
+.fx-metric-card > span { grid-column: 1 / -1; }
+.fx-metric-card > strong { font-size: clamp(17px, 5vw, 23px); }
+.fx-metric-card > small { text-align: right; }
+.fx-metric-card > small:last-child { grid-column: 1 / -1; text-align: left; }
 .is-positive { color: var(--positive) !important; }
 .is-negative { color: var(--negative) !important; }
 
@@ -437,6 +445,7 @@ body.numbers-hidden .private-number { filter: blur(8px); user-select: none; }
   .loading-card, .error-card, .tab-panel { grid-row: 3; }
   .metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .metric-card { padding: 16px 13px; }
+  .overview-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cashbook-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cashbook-ledger-view, .cashbook-accounts-view { margin-inline: 0; }
   .cashbook-calendar-card, .cashbook-day-card, .cashbook-accounts-view { border: 1px solid var(--line); border-radius: var(--radius); }
