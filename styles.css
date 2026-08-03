@@ -382,7 +382,7 @@ input::placeholder { color: #53645a; }
 .cashbook-day-button i { width: 4px; height: 4px; border-radius: 50%; background: var(--muted); }
 .cashbook-day-button i.is-expense { background: var(--negative); }
 .cashbook-day-button i.is-income { background: var(--positive); }
-.cashbook-day-button i.is-transfer, .cashbook-day-button i.is-exchange, .cashbook-day-button i.is-credit_card_payment, .cashbook-day-button i.is-investment_funding_transfer { background: var(--warning); }
+.cashbook-day-button i.is-transfer, .cashbook-day-button i.is-exchange, .cashbook-day-button i.is-credit_card_payment, .cashbook-day-button i.is-investment_funding_transfer, .cashbook-day-button i.is-investment_recovery_transfer { background: var(--warning); }
 .cashbook-day-button i.is-usd { background: #84b7ff; }
 .cashbook-day-button.is-selected i { box-shadow: 0 0 0 1px rgba(7, 16, 11, 0.4); }
 .cashbook-day-card { padding: 17px 16px 0; background: rgba(8, 17, 11, 0.85); }

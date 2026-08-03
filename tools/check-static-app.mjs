@@ -67,6 +67,11 @@ for (const source of ["cashbook_accounts", "cashbook_account_balances", "cashboo
 for (const behavior of ["armedDate", "openCashbookForm", "saveCashbookEvent", "loadCashbook", "investment_mobile", "property_cost_recovery"]) {
   if (!app.includes(behavior)) throw new Error(`Missing mobile cashbook behavior: ${behavior}`);
 }
+if (!html.includes('<option value="investment_recovery_transfer">資產回收</option>')) throw new Error("Asset recovery event option missing");
+for (const behavior of ["investment_recovery_transfer", "asset_recovery_basis", "net_sale_proceeds", "實際淨收款"]) {
+  if (!app.includes(behavior)) throw new Error(`Missing asset recovery behavior: ${behavior}`);
+}
+if (!css.includes("is-investment_recovery_transfer")) throw new Error("Asset recovery calendar marker missing");
 if (!config.includes("sb_publishable_") || config.includes("__SUPABASE_")) throw new Error("Public Supabase config has not been synchronized");
 if (!css.includes("@media (max-width: 380px)") || !css.includes("@media (min-width: 680px)")) throw new Error("Responsive breakpoints missing");
 if (!workflow.includes("actions/deploy-pages")) throw new Error("GitHub Pages deployment step missing");
