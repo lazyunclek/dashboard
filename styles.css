@@ -363,6 +363,11 @@ input::placeholder { color: #53645a; }
 .cashbook-view-switch button { min-height: 38px; border: 0; border-radius: 9px; color: var(--muted); background: transparent; font-size: 12px; font-weight: 750; cursor: pointer; }
 .cashbook-view-switch button.is-active { color: #07100b; background: var(--text); }
 .cashbook-ledger-view { display: grid; gap: 0; margin-inline: -16px; }
+.cashbook-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; border-block: 1px solid var(--line); background: var(--line); }
+.cashbook-summary-grid article { min-width: 0; padding: 12px 10px; background: var(--panel-soft); }
+.cashbook-summary-grid span, .cashbook-summary-grid small { display: block; color: var(--muted); font-size: 9px; }
+.cashbook-summary-grid strong { display: block; margin: 7px 0 5px; overflow: hidden; color: var(--text); text-overflow: ellipsis; white-space: nowrap; font: 720 13px/1.2 var(--mono); }
+.cashbook-summary-grid small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 8px; }
 .cashbook-calendar-card { min-width: 0; padding: 12px 12px 7px; border-block: 1px solid var(--line); background: rgba(2, 7, 4, 0.6); }
 .cashbook-month-toolbar { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; text-align: center; }
 .cashbook-month-toolbar > div { min-width: 0; }

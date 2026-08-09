@@ -18,7 +18,7 @@ const state = {
   refreshToken: window.localStorage.getItem(storageKeys.refresh) || "",
   userEmail: window.localStorage.getItem(storageKeys.email) || "",
   data: null,
-  activeTab: "overview",
+  activeTab: "cashbook",
   marketFilter: "all",
   transactionAssetId: "",
   transactionQuery: "",
@@ -774,12 +774,18 @@ async function loadCashbook() {
   try {
     await cashbookRpc("cashbook_ensure_defaults");
     const { start, end } = cashbookMonthBounds(state.cashbook.month);
+    const rangeStart = new Date(`${start}T00:00:00`);
+    rangeStart.setDate(rangeStart.getDate() - rangeStart.getDay());
+    const rangeEnd = new Date(`${end}T00:00:00`);
+    rangeEnd.setDate(rangeEnd.getDate() + (7 - rangeEnd.getDay()) % 7);
+    const queryStart = localDateKey(rangeStart);
+    const queryEnd = localDateKey(rangeEnd);
     const [accountRows, balanceRows, categories, ledger, events] = await Promise.all([
       fetchAll("cashbook_accounts?select=*&order=status.asc,name.asc"),
       fetchAll("cashbook_account_balances?select=*&order=status.asc,name.asc"),
       fetchAll("cashbook_categories?select=*&order=category_type.asc,sort_order.asc,name.asc"),
-      fetchAll(`cashbook_ledger?select=*&occurred_on=gte.${start}&occurred_on=lt.${end}&order=occurred_on.desc,created_at.desc&limit=500`),
-      fetchAll(`cashbook_events?select=id,source_payload&occurred_on=gte.${start}&occurred_on=lt.${end}&order=occurred_on.desc,created_at.desc&limit=500`)
+      fetchAll(`cashbook_ledger?select=*&occurred_on=gte.${queryStart}&occurred_on=lt.${queryEnd}&order=occurred_on.desc,created_at.desc&limit=500`),
+      fetchAll(`cashbook_events?select=id,source_payload&occurred_on=gte.${queryStart}&occurred_on=lt.${queryEnd}&order=occurred_on.desc,created_at.desc&limit=500`)
     ]);
     const balanceById = new Map(balanceRows.map((row) => [row.account_id, row]));
     const payloadById = new Map(events.map((row) => [row.id, row.source_payload || {}]));
@@ -890,7 +896,7 @@ function cashbookEntryDetail(row) {
   const source = row.source_account_name || cashbookAccount(row.source_account_id)?.name;
   const destination = row.destination_account_name || cashbookAccount(row.destination_account_id)?.name;
   const accountPath = source && destination ? `${source} → ${destination}` : source || destination || "—";
-  const details = [accountPath, row.category_name].filter(Boolean);
+  const details = [accountPath, row.category_name, row.note].filter(Boolean);
   if (row.event_type === "expense" && row.original_currency !== row.account_currency && row.source_amount) {
     details.push(`實扣 ${cashbookMoney(row.source_amount, row.account_currency)}`);
   }
@@ -932,9 +938,39 @@ function renderCashbookDay() {
   }
 }
 
+function cashbookExpenseTwd(row) {
+  if (row.status !== "posted" || row.event_type !== "expense") return 0;
+  if (row.twd_value !== null && row.twd_value !== undefined && Number.isFinite(Number(row.twd_value))) return Math.abs(Number(row.twd_value));
+  if (row.original_currency === "TWD") return Math.abs(num(row.original_amount));
+  if (row.account_currency === "TWD") return Math.abs(num(row.source_amount));
+  return 0;
+}
+
+function renderCashbookSummaries() {
+  const selectedDate = state.cashbook.selectedDate || localDateKey();
+  const selected = new Date(`${selectedDate}T00:00:00`);
+  const weekStart = new Date(selected);
+  weekStart.setDate(selected.getDate() - selected.getDay());
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  const weekStartKey = localDateKey(weekStart);
+  const weekEndKey = localDateKey(weekEnd);
+  const expenseRows = state.cashbook.ledger.filter((row) => row.status === "posted" && row.event_type === "expense");
+  const summaries = [
+    ["day", expenseRows.filter((row) => row.occurred_on === selectedDate), `${selectedDate.slice(5).replace("-", "/")} 累計`],
+    ["week", expenseRows.filter((row) => row.occurred_on >= weekStartKey && row.occurred_on <= weekEndKey), `${weekStartKey.slice(5).replace("-", "/")}–${weekEndKey.slice(5).replace("-", "/")}`],
+    ["month", expenseRows.filter((row) => row.occurred_on.startsWith(state.cashbook.month)), `${state.cashbook.month.replace("-", "/")} 累計`]
+  ];
+  for (const [key, rows, period] of summaries) {
+    byId(`cashbook-${key}-expense`).textContent = cashbookMoney(rows.reduce((sum, row) => sum + cashbookExpenseTwd(row), 0), "TWD");
+    byId(`cashbook-${key}-expense-note`).textContent = `${period} · ${rows.length} 筆支出`;
+  }
+}
+
 function renderCashbook() {
   renderCashbookAccounts();
   renderCashbookCalendar();
+  renderCashbookSummaries();
   renderCashbookDay();
   showCashbookView(state.cashbook.view);
 }
@@ -1539,6 +1575,7 @@ document.addEventListener("click", (event) => {
       state.cashbook.selectedDate = dateKey;
       state.cashbook.armedDate = dateKey;
       renderCashbookCalendar();
+      renderCashbookSummaries();
       renderCashbookDay();
     }
     return;

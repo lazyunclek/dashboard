@@ -15,7 +15,7 @@ const [html, css, app, config, workflow] = await Promise.all([
   fs.readFile(path.join(root, ".github/workflows/pages.yml"), "utf8")
 ]);
 
-for (const token of ["login-view", "dashboard-view", "positions-list", "transaction-search", "transaction-filters", "transaction-list", "current-cash", "running-grid-count", "cashbook-panel", "cashbook-calendar-grid", "cashbook-entry-list", "cashbook-form"]) {
+for (const token of ["login-view", "dashboard-view", "positions-list", "transaction-search", "transaction-filters", "transaction-list", "current-cash", "running-grid-count", "cashbook-panel", "cashbook-calendar-grid", "cashbook-entry-list", "cashbook-day-expense", "cashbook-week-expense", "cashbook-month-expense", "cashbook-form"]) {
   if (!html.includes(`id="${token}"`)) throw new Error(`Missing HTML target: ${token}`);
 }
 if (html.includes('id="top-positions"') || html.includes("主要持倉")) throw new Error("Overview must not duplicate the positions list");
@@ -66,6 +66,9 @@ for (const source of ["cashbook_accounts", "cashbook_account_balances", "cashboo
 }
 for (const behavior of ["armedDate", "openCashbookForm", "saveCashbookEvent", "loadCashbook", "investment_mobile", "property_cost_recovery"]) {
   if (!app.includes(behavior)) throw new Error(`Missing mobile cashbook behavior: ${behavior}`);
+}
+for (const behavior of ['activeTab: "cashbook"', "renderCashbookSummaries", "cashbookExpenseTwd", "row.note"]) {
+  if (!app.includes(behavior)) throw new Error(`Missing cashbook privacy or reporting behavior: ${behavior}`);
 }
 if (!html.includes('<option value="investment_recovery_transfer">資產回收</option>')) throw new Error("Asset recovery event option missing");
 for (const behavior of ["investment_recovery_transfer", "asset_recovery_basis", "net_sale_proceeds", "實際淨收款"]) {
