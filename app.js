@@ -1001,12 +1001,20 @@ function addAccountOptions(select, groups, selectedValue = "") {
     for (const account of group.accounts) {
       const option = document.createElement("option");
       option.value = account.id;
-      option.textContent = `${account.name} · ${account.currency}`;
+      option.textContent = `${account.name} · ${account.currency} · ${cashbookMoney(account.balance, account.currency, true)}`;
       option.selected = account.id === selectedValue;
       optgroup.append(option);
     }
     select.append(optgroup);
   }
+}
+
+function renderCashbookAccountBalanceHint(selectId, hintId) {
+  const account = cashbookAccount(byId(selectId).value);
+  const hint = byId(hintId);
+  hint.classList.toggle("is-negative", Boolean(account && num(account.balance) < 0));
+  hint.classList.toggle("private-number", Boolean(account));
+  hint.textContent = account ? `目前餘額 ${cashbookMoney(account.balance, account.currency, true)}` : "選擇帳戶後顯示目前餘額";
 }
 
 function refreshCashbookForm({ rebuildOptions = false } = {}) {
@@ -1051,6 +1059,8 @@ function refreshCashbookForm({ rebuildOptions = false } = {}) {
   }
   const source = cashbookAccount(sourceSelect.value);
   const destination = cashbookAccount(destinationSelect.value);
+  renderCashbookAccountBalanceHint("cashbook-source-account", "cashbook-source-balance");
+  renderCashbookAccountBalanceHint("cashbook-destination-account", "cashbook-destination-balance");
   const isExpense = mode === "expense";
   const isIncome = mode === "income";
   const isTransfer = mode === "transfer";
