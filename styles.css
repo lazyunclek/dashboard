@@ -452,7 +452,7 @@ body.sheet-open { position: fixed; width: 100%; overflow: hidden; }
 .cashbook-form { gap: 14px; }
 .cashbook-form-grid { display: grid; gap: 13px; }
 .cashbook-form-grid label[hidden] { display: none; }
-.cashbook-account-balance-hint { display: block; min-height: 14px; margin-top: -1px; color: var(--muted); font: 11px/1.25 var(--mono); }
+.cashbook-account-balance-hint { display: block; min-height: 12px; margin-top: -1px; color: var(--muted); font: 9px/1.25 var(--mono); }
 .cashbook-account-balance-hint.is-negative { color: var(--negative); }
 .cashbook-amount-field input { font: 750 24px/1 var(--mono); letter-spacing: -0.04em; }
 .cashbook-check-field { min-height: 72px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 12px; background: rgba(4, 10, 6, 0.84); }

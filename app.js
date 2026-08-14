@@ -1001,7 +1001,8 @@ function addAccountOptions(select, groups, selectedValue = "") {
     for (const account of group.accounts) {
       const option = document.createElement("option");
       option.value = account.id;
-      option.textContent = `${account.name} · ${account.currency} · ${cashbookMoney(account.balance, account.currency, true)}`;
+      // Keep sensitive balances out of the native account picker; show the balance only below the selected field.
+      option.textContent = `${account.name} · ${account.currency}`;
       option.selected = account.id === selectedValue;
       optgroup.append(option);
     }
