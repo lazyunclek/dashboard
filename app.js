@@ -525,7 +525,9 @@ function buildDashboard(raw) {
   const gridInvestmentUsd = runningGrids.reduce((sum, row) => sum + num(row.investment_usdt), 0);
   const runningGridPnlUsd = runningGrids.reduce((sum, row) => sum + num(row.realized_pnl), 0);
   const gridPnlUsd = [...runningGrids, ...closedGrids].reduce((sum, row) => sum + num(row.realized_pnl), 0);
-  const gridValueTwd = (gridInvestmentUsd + gridPnlUsd) * currentFx;
+  // Closed-grid cash has returned to the cashbook.  Do not retain its P/L as
+  // a second asset value; keep it only in the performance figures below.
+  const gridValueTwd = (gridInvestmentUsd + runningGridPnlUsd) * currentFx;
   const gridCostTwd = gridInvestmentUsd * pooledCostFx;
 
   const classes = {
@@ -1420,7 +1422,7 @@ function exposureItems() {
   const gridGroup = data.groups.find((group) => group.key === "crypto");
   const spotCryptoValue = data.positions.filter((row) => row.assetClass === "crypto").reduce((sum, row) => sum + num(row.marketValueTwd), 0);
   const gridValue = Math.max(0, num(gridGroup?.valueTwd) - spotCryptoValue);
-  if (gridValue) items.push({ label: level === "primarySector" ? "網格策略" : "合約網格", subTheme: "合約網格", symbol: "GRID", name: "運行中與已關閉策略淨值", valueTwd: gridValue });
+  if (gridValue) items.push({ label: level === "primarySector" ? "網格策略" : "合約網格", subTheme: "合約網格", symbol: "GRID", name: "運行中策略淨值", valueTwd: gridValue });
   if (data.propertyValueTwd > 0) items.push({ label: level === "primarySector" ? "房地產" : "房屋與車位", subTheme: "房屋與車位", symbol: "PROPERTY", name: "已付可回收本金＋預估獲利", valueTwd: data.propertyValueTwd });
   return items;
 }
