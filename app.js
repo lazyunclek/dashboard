@@ -190,12 +190,6 @@ function perSharePrice(value, currency, assetClass) {
   return `${currency === "TWD" ? "NT$" : `${currency} `}${formatted}`;
 }
 
-function fixedTwoDecimalPrice(value, currency) {
-  if (value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
-  const formatted = new Intl.NumberFormat("zh-TW", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value));
-  return `${currency === "TWD" ? "NT$" : `${currency} `}${formatted}`;
-}
-
 function quantity(value, scale = 4) {
   return new Intl.NumberFormat("zh-TW", { maximumFractionDigits: Math.min(8, Math.max(0, num(scale))) }).format(num(value));
 }
@@ -699,10 +693,10 @@ function positionCard(position) {
       </span>
     </summary>
     <div class="position-details">
-      <span class="position-detail"><span>持有數量</span><strong class="private-number">${quantity(position.quantity, 0)} ${escapeHtml(position.quantityUnit || "")}</strong></span>
+      <span class="position-detail"><span>持有數量</span><strong class="private-number">${quantity(position.quantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</strong></span>
       <span class="position-detail"><span>持倉均價</span><strong class="private-number">${perSharePrice(position.averageCost, position.quoteCurrency, position.assetClass)}</strong></span>
       <span class="position-detail"><span>最新價格</span><strong class="private-number">${perSharePrice(position.marketPrice, position.marketPriceCurrency, position.assetClass)}${position.marketPriceStatus === "stale" ? '<small class="price-status is-stale">行情過期</small>' : ""}</strong></span>
-      <span class="position-detail"><span>累計買入均價</span><strong class="private-number">${fixedTwoDecimalPrice(position.buyAveragePrice, position.quoteCurrency)}</strong></span>
+      <span class="position-detail"><span>累計買入均價</span><strong class="private-number">${perSharePrice(position.buyAveragePrice, position.quoteCurrency, position.assetClass)}</strong></span>
       <span class="position-detail"><span>剩餘成本</span><strong class="private-number">${money(position.costTwd)}</strong></span>
       <span class="position-detail"><span>累計賣出均價</span><strong class="private-number">${perSharePrice(position.sellAveragePrice, position.quoteCurrency, position.assetClass)}</strong></span>
       <span class="position-detail"><span>未實現損益</span><strong class="private-number ${pnlTone}">${hasPnl ? money(pnl, "TWD", true) : "—"}</strong></span>
