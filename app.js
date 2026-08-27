@@ -20,6 +20,7 @@ const state = {
   data: null,
   activeTab: "cashbook",
   marketFilter: "all",
+  positionStatus: "open",
   transactionAssetId: "",
   transactionQuery: "",
   transactionType: "all",
@@ -381,8 +382,11 @@ function buildDashboard(raw) {
       quantityScale: asset.quantity_scale,
       priceScale: asset.price_scale,
       quantity: ledger.quantity,
+      soldQuantity: ledger.soldQuantity,
       costNative: ledger.remainingCost,
       costTwd,
+      boughtCostTwd: ledger.boughtCost * costFx,
+      soldProceedsTwd: ledger.soldProceeds * costFx,
       averageCost: ledger.quantity > 0 ? ledger.remainingCost / ledger.quantity : null,
       buyAveragePrice: ledger.buyAveragePrice,
       sellAveragePrice: ledger.sellAveragePrice,
@@ -403,6 +407,7 @@ function buildDashboard(raw) {
       lastTransactionType: lastRow?.transaction_type || null,
       primarySector: asset.metadata?.primary_sector || "其他／待分類",
       subTheme: asset.metadata?.sub_theme || "未分類",
+      isClosed: Math.abs(ledger.quantity) < 1e-10,
       excluded: Boolean(asset.metadata?.exclude_from_portfolio_value || asset.metadata?.funding_pool)
     });
   }
@@ -444,8 +449,11 @@ function buildDashboard(raw) {
       quantityScale: 8,
       priceScale: 8,
       quantity: num(component.quantity),
+      soldQuantity: 0,
       costNative: null,
       costTwd,
+      boughtCostTwd: null,
+      soldProceedsTwd: null,
       averageCost: null,
       buyAveragePrice: null,
       sellAveragePrice: null,
@@ -466,12 +474,14 @@ function buildDashboard(raw) {
       lastTransactionType: null,
       primarySector: component.metadata?.primary_sector || "其他／待分類",
       subTheme: component.metadata?.sub_theme || "未分類",
+      isClosed: Math.abs(num(component.quantity)) < 1e-10,
       excluded: !component.included_in_total
     });
   }
 
   const investablePositions = positions.filter((row) => !row.excluded);
-  const openPositions = investablePositions.filter((row) => Math.abs(row.quantity) > 1e-10);
+  const openPositions = investablePositions.filter((row) => !row.isClosed);
+  const closedPositions = investablePositions.filter((row) => row.isClosed && row.lastTransactionDate);
   const eligibleCashTypes = new Set(["cash", "bank", "electronic_payment", "debit_card", "credit_card"]);
   const activeCashbookBalances = (raw.cashbookBalances || []).filter((row) => row.status === "active" && eligibleCashTypes.has(row.account_type));
   const cashBalances = ["TWD", "USD", "USDC", "USDT"].map((currency) => {
@@ -587,6 +597,7 @@ function buildDashboard(raw) {
   return {
     portfolio,
     positions: openPositions.sort((a, b) => num(b.marketValueTwd) - num(a.marketValueTwd)),
+    closedPositions: closedPositions.sort((a, b) => String(b.lastTransactionDate || "").localeCompare(String(a.lastTransactionDate || ""))),
     allPositions: investablePositions,
     transactions: transactions.sort((a, b) => String(b.trade_date).localeCompare(String(a.trade_date)) || String(b.created_at).localeCompare(String(a.created_at))),
     incomeEvents: incomeEvents.sort((a, b) => String(b.event_date).localeCompare(String(a.event_date))),
@@ -664,6 +675,7 @@ function spotPositionKey(symbol) {
 function positionCard(position) {
   const details = document.createElement("details");
   details.className = "position-card";
+  const isClosed = Boolean(position.isClosed);
   const pnl = num(position.unrealizedPnlTwd);
   const hasPnl = position.marketValueTwd !== null && position.unrealizedPnlTwd !== null;
   const pnlAmount = hasPnl ? money(pnl, "TWD", true) : "—";
@@ -673,6 +685,7 @@ function positionCard(position) {
   const pnlTone = !hasPnl ? "" : pnl >= 0 ? "is-positive" : "is-negative";
   const realizedTotal = num(position.realizedPnlTwd) + num(position.incomeTwd);
   const realizedTone = realizedTotal > 0 ? "is-positive" : realizedTotal < 0 ? "is-negative" : "";
+  const openAverageCost = perSharePrice(position.averageCost, position.quoteCurrency, position.assetClass);
   const ledgerTransactions = state.data.transactions.filter((row) => row.asset_id === position.id && row.details?.event_role !== "asset_fee");
   const buyCount = ledgerTransactions.filter((row) => row.transaction_type === "buy").length;
   const sellCount = ledgerTransactions.filter((row) => row.transaction_type === "sell").length;
@@ -688,19 +701,19 @@ function positionCard(position) {
         <span class="position-name">${escapeHtml(position.name)}</span>
       </span>
       <span class="position-value">
-        <strong class="private-number">${money(position.marketValueTwd)}</strong>
-        <small class="private-number position-return ${pnlTone}"><span>${pnlAmount}</span><span aria-hidden="true">·</span><span>${pnlPercent}</span></small>
+        <strong class="private-number ${isClosed ? realizedTone : ""}">${isClosed ? money(realizedTotal, "TWD", true) : money(position.marketValueTwd)}</strong>
+        <small class="private-number position-return ${isClosed ? realizedTone : pnlTone}">${isClosed ? "已實現合計" : `<span>${pnlAmount}</span><span aria-hidden="true">·</span><span>${pnlPercent}</span>`}</small>
       </span>
     </summary>
     <div class="position-details">
-      <span class="position-detail"><span>持有數量</span><strong class="private-number">${quantity(position.quantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</strong></span>
-      <span class="position-detail"><span>持倉均價</span><strong class="private-number">${perSharePrice(position.averageCost, position.quoteCurrency, position.assetClass)}</strong></span>
-      <span class="position-detail"><span>最新價格</span><strong class="private-number">${perSharePrice(position.marketPrice, position.marketPriceCurrency, position.assetClass)}${position.marketPriceStatus === "stale" ? '<small class="price-status is-stale">行情過期</small>' : ""}</strong></span>
+      <span class="position-detail"><span>${isClosed ? "已清倉數量" : "持有數量"}</span><strong class="private-number">${quantity(isClosed ? position.soldQuantity : position.quantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</strong></span>
+      <span class="position-detail"><span>${isClosed ? "當初購買均價" : "持倉均價"}</span><strong class="private-number">${isClosed ? perSharePrice(position.buyAveragePrice, position.quoteCurrency, position.assetClass) : openAverageCost}</strong></span>
+      <span class="position-detail"><span>${isClosed ? "出清均價" : "最新價格"}</span><strong class="private-number">${perSharePrice(isClosed ? position.sellAveragePrice : position.marketPrice, isClosed ? position.quoteCurrency : position.marketPriceCurrency, position.assetClass)}${!isClosed && position.marketPriceStatus === "stale" ? '<small class="price-status is-stale">行情過期</small>' : ""}</strong></span>
       <span class="position-detail"><span>累計買入均價</span><strong class="private-number">${perSharePrice(position.buyAveragePrice, position.quoteCurrency, position.assetClass)}</strong></span>
-      <span class="position-detail"><span>剩餘成本</span><strong class="private-number">${money(position.costTwd)}</strong></span>
+      <span class="position-detail"><span>${isClosed ? "累計買入實付" : "剩餘成本"}</span><strong class="private-number">${money(isClosed ? position.boughtCostTwd : position.costTwd)}</strong></span>
       <span class="position-detail"><span>累計賣出均價</span><strong class="private-number">${perSharePrice(position.sellAveragePrice, position.quoteCurrency, position.assetClass)}</strong></span>
-      <span class="position-detail"><span>未實現損益</span><strong class="private-number ${pnlTone}">${hasPnl ? money(pnl, "TWD", true) : "—"}</strong></span>
-      <span class="position-detail"><span>未實現報酬</span><strong class="private-number ${pnlTone}">${position.unrealizedPnlPct === null ? "零成本／待補" : pnlPercent}</strong></span>
+      <span class="position-detail"><span>${isClosed ? "累計賣出實收" : "未實現損益"}</span><strong class="private-number ${isClosed ? realizedTone : pnlTone}">${isClosed ? money(position.soldProceedsTwd) : hasPnl ? money(pnl, "TWD", true) : "—"}</strong></span>
+      <span class="position-detail"><span>${isClosed ? "清倉日期" : "未實現報酬"}</span><strong class="private-number ${pnlTone}">${isClosed ? dateTime(position.lastTransactionDate) : position.unrealizedPnlPct === null ? "零成本／待補" : pnlPercent}</strong></span>
       <span class="position-detail"><span>已實現合計</span><strong class="private-number ${realizedTone}">${money(realizedTotal, "TWD", true)}</strong></span>
       <span class="position-detail"><span>主題</span><strong>${escapeHtml(position.subTheme)}</strong></span>
       <span class="position-detail"><span>行情時間</span><strong>${dateTime(position.marketPriceAt)}</strong></span>
@@ -1278,12 +1291,13 @@ async function voidCashbookEvent() {
 }
 
 function renderPositions() {
-  const rows = state.data.positions.filter((row) => state.marketFilter === "all" || row.assetClass === state.marketFilter);
+  const source = state.positionStatus === "closed" ? state.data.closedPositions : state.data.positions;
+  const rows = source.filter((row) => state.marketFilter === "all" || row.assetClass === state.marketFilter);
   byId("position-count").textContent = rows.length;
   const list = byId("positions-list");
   list.replaceChildren();
   if (!rows.length) {
-    list.innerHTML = '<div class="empty-state">這個分類目前沒有持倉</div>';
+    list.innerHTML = `<div class="empty-state">這個分類目前沒有${state.positionStatus === "closed" ? "已清倉標的" : "持倉"}</div>`;
     return;
   }
   rows.forEach((row) => list.append(positionCard(row)));
@@ -1542,6 +1556,12 @@ document.querySelectorAll("[data-go-tab]").forEach((button) => button.addEventLi
 document.querySelectorAll("#position-filters .filter-chip").forEach((button) => button.addEventListener("click", () => {
   state.marketFilter = button.dataset.market;
   document.querySelectorAll("#position-filters .filter-chip").forEach((chip) => chip.classList.toggle("is-active", chip === button));
+  renderPositions();
+}));
+
+document.querySelectorAll("[data-position-status]").forEach((button) => button.addEventListener("click", () => {
+  state.positionStatus = button.dataset.positionStatus;
+  document.querySelectorAll("[data-position-status]").forEach((toggle) => toggle.classList.toggle("is-active", toggle === button));
   renderPositions();
 }));
 
