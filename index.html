@@ -196,6 +196,11 @@
           <button class="position-status-button is-active" data-position-status="open" type="button">現有持倉</button>
           <button class="position-status-button" data-position-status="closed" type="button">已清倉</button>
         </div>
+        <div class="position-currency-toggle" role="group" aria-label="持倉金額幣別">
+          <button class="position-currency-button is-active" data-position-currency="TWD" type="button">台幣</button>
+          <button class="position-currency-button" data-position-currency="USD" type="button">美元</button>
+        </div>
+        <p class="position-currency-hint">美元顯示套用於美股；其他持倉維持台幣。</p>
         <div id="positions-list" class="position-list"></div>
       </section>
 
