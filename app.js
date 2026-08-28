@@ -708,6 +708,9 @@ function positionCard(position) {
   const realizedTotal = num(position.realizedPnlTwd) + num(position.incomeTwd);
   const realizedTotalNative = num(position.realizedPnlNative) + num(position.incomeNative);
   const realizedTone = realizedTotal > 0 ? "is-positive" : realizedTotal < 0 ? "is-negative" : "";
+  const totalPnl = isClosed ? realizedTotal : num(position.totalPnlTwd);
+  const totalPnlNative = isClosed ? realizedTotalNative : realizedTotalNative + num(nativePnl);
+  const totalPnlTone = totalPnl > 0 ? "is-positive" : totalPnl < 0 ? "is-negative" : "";
   const openAverageCost = perSharePrice(position.averageCost, position.quoteCurrency, position.assetClass);
   const ledgerTransactions = state.data.transactions.filter((row) => row.asset_id === position.id && row.details?.event_role !== "asset_fee");
   const buyCount = ledgerTransactions.filter((row) => row.transaction_type === "buy").length;
@@ -738,6 +741,7 @@ function positionCard(position) {
       <span class="position-detail"><span>${isClosed ? "累計賣出實收" : "未實現損益"}</span><strong class="private-number ${isClosed ? realizedTone : pnlTone}">${isClosed ? money(usesUsd ? position.soldProceedsNative : position.soldProceedsTwd, displayCurrency) : usesUsd ? money(nativePnl, "USD", true) : hasPnl ? money(pnl, "TWD", true) : "—"}</strong></span>
       <span class="position-detail"><span>${isClosed ? "清倉日期" : "未實現報酬"}</span><strong class="private-number ${pnlTone}">${isClosed ? dateTime(position.lastTransactionDate) : position.unrealizedPnlPct === null ? "零成本／待補" : pnlPercent}</strong></span>
       <span class="position-detail"><span>已實現合計</span><strong class="private-number ${realizedTone}">${money(usesUsd ? realizedTotalNative : realizedTotal, displayCurrency, true)}</strong></span>
+      <span class="position-detail"><span>總損益</span><strong class="private-number ${totalPnlTone}">${money(usesUsd ? totalPnlNative : totalPnl, displayCurrency, true)}</strong></span>
       <span class="position-detail"><span>主題</span><strong>${escapeHtml(position.subTheme)}</strong></span>
       <span class="position-detail"><span>行情時間</span><strong>${dateTime(position.marketPriceAt)}</strong></span>
     </div>
