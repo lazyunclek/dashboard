@@ -711,6 +711,10 @@ function positionCard(position) {
   const totalPnl = isClosed ? realizedTotal : num(position.totalPnlTwd);
   const totalPnlNative = isClosed ? realizedTotalNative : realizedTotalNative + num(nativePnl);
   const totalPnlTone = totalPnl > 0 ? "is-positive" : totalPnl < 0 ? "is-negative" : "";
+  const summaryValue = isClosed
+    ? usesUsd ? position.soldProceedsNative : position.soldProceedsTwd
+    : usesUsd ? position.marketValueNative : position.marketValueTwd;
+  const summaryValueLabel = isClosed ? "累計賣出實收" : "目前市值";
   const openAverageCost = perSharePrice(position.averageCost, position.quoteCurrency, position.assetClass);
   const ledgerTransactions = state.data.transactions.filter((row) => row.asset_id === position.id && row.details?.event_role !== "asset_fee");
   const buyCount = ledgerTransactions.filter((row) => row.transaction_type === "buy").length;
@@ -727,8 +731,14 @@ function positionCard(position) {
         <span class="position-name">${escapeHtml(position.name)}</span>
       </span>
       <span class="position-value">
-        <strong class="private-number ${isClosed ? realizedTone : ""}">${isClosed ? money(usesUsd ? realizedTotalNative : realizedTotal, displayCurrency, true) : money(usesUsd ? position.marketValueNative : position.marketValueTwd, displayCurrency)}</strong>
-        <small class="private-number position-return ${isClosed ? realizedTone : pnlTone}">${isClosed ? "已實現合計" : `<span>${pnlAmount}</span><span aria-hidden="true">·</span><span>${pnlPercent}</span>`}</small>
+        <span class="position-summary-metric">
+          <small>${summaryValueLabel}</small>
+          <strong class="private-number">${money(summaryValue, displayCurrency)}</strong>
+        </span>
+        <span class="position-summary-metric position-total-pnl ${totalPnlTone}">
+          <small>總損益</small>
+          <strong class="private-number">${money(usesUsd ? totalPnlNative : totalPnl, displayCurrency, true)}</strong>
+        </span>
       </span>
     </summary>
     <div class="position-details">
@@ -974,12 +984,12 @@ function renderCashbookDay() {
   for (const row of rows) {
     const item = document.createElement("button");
     item.type = "button";
-    item.className = "cashbook-entry-row";
+    const tone = row.event_type === "expense" ? "is-expense" : row.event_type === "income" ? "is-income" : "is-transfer";
+    item.className = `cashbook-entry-row ${tone}`;
     item.dataset.cashbookEventId = row.id;
     const label = cashbookTypeLabels[row.event_type] || row.event_type;
     const merchant = row.merchant || row.category_name || label;
-    const tone = row.event_type === "expense" ? "is-expense" : row.event_type === "income" ? "is-income" : "is-transfer";
-    item.innerHTML = `<span class="cashbook-entry-type ${tone}">${escapeHtml(label)}</span><span class="cashbook-entry-copy"><strong>${escapeHtml(merchant)}</strong><small>${escapeHtml(cashbookEntryDetail(row))}</small></span><span class="cashbook-entry-value private-number">${escapeHtml(cashbookEntryAmount(row))}<small>點擊修改</small></span>`;
+    item.innerHTML = `<span class="cashbook-entry-copy"><span class="cashbook-entry-heading"><span class="cashbook-entry-type ${tone}">${escapeHtml(label)}</span><strong>${escapeHtml(merchant)}</strong></span><small>${escapeHtml(cashbookEntryDetail(row))}</small></span><span class="cashbook-entry-value private-number">${escapeHtml(cashbookEntryAmount(row))}<small>點擊修改</small></span>`;
     list.append(item);
   }
 }

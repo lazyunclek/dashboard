@@ -22,7 +22,7 @@ if (html.includes('id="top-positions"') || html.includes("主要持倉")) throw 
 for (const token of ["data-asset-ledger", "data-transaction-type", "transactionAssetId", "row.asset_id !== state.transactionAssetId", "transactionQuery", "transactionType", "renderActivity();\n  showTab(\"activity\")"]) {
   if (!app.includes(token)) throw new Error(`Missing ledger filter behavior: ${token}`);
 }
-for (const token of ["position-return", "pnlPercent", "unrealizedPnlPct.toFixed(2)"]) {
+for (const token of ["pnlPercent", "unrealizedPnlPct.toFixed(2)"]) {
   if (!app.includes(token)) throw new Error(`Missing visible position return percentage: ${token}`);
 }
 for (const behavior of ["positionExpandedIds", "details.open = state.positionExpandedIds.has(position.id)", "details.addEventListener(\"toggle\""]) {
@@ -75,6 +75,12 @@ for (const behavior of ["armedDate", "openCashbookForm", "saveCashbookEvent", "l
 }
 for (const behavior of ['activeTab: "cashbook"', "renderCashbookSummaries", "cashbookExpenseTwd", "row.note"]) {
   if (!app.includes(behavior)) throw new Error(`Missing cashbook privacy or reporting behavior: ${behavior}`);
+}
+for (const behavior of ["summaryValueLabel", "累計賣出實收", "position-total-pnl", "cashbook-entry-heading", "cashbook-entry-row ${tone}"]) {
+  if (!app.includes(behavior)) throw new Error(`Missing visible mobile direction or profit label: ${behavior}`);
+}
+for (const behavior of ["cashbook-entry-type.is-expense", "cashbook-entry-type.is-income", "cashbook-entry-row.is-expense .cashbook-entry-value", "cashbook-entry-row.is-income .cashbook-entry-value"]) {
+  if (!css.includes(behavior)) throw new Error(`Missing cashbook direction color behavior: ${behavior}`);
 }
 if (!html.includes('<option value="investment_recovery_transfer">資產回收</option>')) throw new Error("Asset recovery event option missing");
 for (const behavior of ["investment_recovery_transfer", "asset_recovery_basis", "net_sale_proceeds", "實際淨收款"]) {
