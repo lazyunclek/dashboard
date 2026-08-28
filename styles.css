@@ -425,6 +425,12 @@ input::placeholder { color: #53645a; }
 .cashbook-entry-row.is-transfer .cashbook-entry-value { color: var(--warning); }
 .cashbook-entry-row.is-funding .cashbook-entry-value { color: var(--investment-funding); }
 .cashbook-entry-row.is-recovery .cashbook-entry-value { color: var(--investment-recovery); }
+.cashbook-entry-row[data-cashbook-event-type="investment_funding_transfer"] .cashbook-entry-type,
+.cashbook-entry-row[data-cashbook-event-type="investment_funding_transfer"] .cashbook-entry-value { color: var(--investment-funding) !important; }
+.cashbook-entry-row[data-cashbook-event-type="investment_funding_transfer"] .cashbook-entry-copy > small { color: var(--investment-funding); }
+.cashbook-entry-row[data-cashbook-event-type="investment_recovery_transfer"] .cashbook-entry-type,
+.cashbook-entry-row[data-cashbook-event-type="investment_recovery_transfer"] .cashbook-entry-value { color: var(--investment-recovery) !important; }
+.cashbook-entry-row[data-cashbook-event-type="investment_recovery_transfer"] .cashbook-entry-copy > small { color: var(--investment-recovery); }
 .cashbook-accounts-view { margin-inline: -16px; border-block: 1px solid var(--line); background: rgba(8, 17, 11, 0.85); }
 .cashbook-account-group + .cashbook-account-group { margin-top: 18px; }
 .cashbook-account-group-title { display: flex; justify-content: space-between; padding: 12px 16px 8px; color: var(--muted); font-size: 12px; }

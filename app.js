@@ -995,6 +995,7 @@ function renderCashbookDay() {
     const tone = cashbookEntryTone(row.event_type);
     item.className = `cashbook-entry-row ${tone}`;
     item.dataset.cashbookEventId = row.id;
+    item.dataset.cashbookEventType = row.event_type;
     const label = cashbookTypeLabels[row.event_type] || row.event_type;
     const merchant = row.merchant || row.category_name || label;
     item.innerHTML = `<span class="cashbook-entry-copy"><span class="cashbook-entry-heading"><span class="cashbook-entry-type ${tone}">${escapeHtml(label)}</span><strong>${escapeHtml(merchant)}</strong></span><small>${escapeHtml(cashbookEntryDetail(row))}</small></span><span class="cashbook-entry-value private-number">${escapeHtml(cashbookEntryAmount(row))}<small>點擊修改</small></span>`;

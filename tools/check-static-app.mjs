@@ -79,10 +79,10 @@ for (const behavior of ['activeTab: "cashbook"', "renderCashbookSummaries", "cas
 for (const behavior of ["summaryValueLabel", "累計賣出實收", "position-total-pnl", "cashbook-entry-heading", "cashbook-entry-row ${tone}"]) {
   if (!app.includes(behavior)) throw new Error(`Missing visible mobile direction or profit label: ${behavior}`);
 }
-for (const behavior of ["function cashbookEntryTone", "is-funding", "is-recovery"]) {
+for (const behavior of ["function cashbookEntryTone", "is-funding", "is-recovery", "cashbookEventType"]) {
   if (!app.includes(behavior)) throw new Error(`Missing cashbook investment-flow tone behavior: ${behavior}`);
 }
-for (const behavior of ["cashbook-entry-type.is-expense", "cashbook-entry-type.is-income", "cashbook-entry-type.is-funding", "cashbook-entry-type.is-recovery", "cashbook-entry-row.is-expense .cashbook-entry-value", "cashbook-entry-row.is-income .cashbook-entry-value", "cashbook-entry-row.is-funding .cashbook-entry-value", "cashbook-entry-row.is-recovery .cashbook-entry-value", "is-investment_funding_transfer", "is-investment_recovery_transfer"]) {
+for (const behavior of ["cashbook-entry-type.is-expense", "cashbook-entry-type.is-income", "cashbook-entry-type.is-funding", "cashbook-entry-type.is-recovery", "cashbook-entry-row.is-expense .cashbook-entry-value", "cashbook-entry-row.is-income .cashbook-entry-value", "cashbook-entry-row.is-funding .cashbook-entry-value", "cashbook-entry-row.is-recovery .cashbook-entry-value", "data-cashbook-event-type=\"investment_funding_transfer\"", "data-cashbook-event-type=\"investment_recovery_transfer\"", "is-investment_funding_transfer", "is-investment_recovery_transfer"]) {
   if (!css.includes(behavior)) throw new Error(`Missing cashbook direction color behavior: ${behavior}`);
 }
 if (!html.includes('<option value="investment_recovery_transfer">資產回收</option>')) throw new Error("Asset recovery event option missing");
