@@ -13,6 +13,8 @@
   --positive: #82f6a3;
   --negative: #ff7f85;
   --warning: #f7cf68;
+  --investment-funding: #8ab8ff;
+  --investment-recovery: #59d7c4;
   --radius: 18px;
   --mono: "SFMono-Regular", "Roboto Mono", "Cascadia Code", Menlo, monospace;
   --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -395,7 +397,9 @@ input::placeholder { color: #53645a; }
 .cashbook-day-button i { width: 4px; height: 4px; border-radius: 50%; background: var(--muted); }
 .cashbook-day-button i.is-expense { background: var(--negative); }
 .cashbook-day-button i.is-income { background: var(--positive); }
-.cashbook-day-button i.is-transfer, .cashbook-day-button i.is-exchange, .cashbook-day-button i.is-credit_card_payment, .cashbook-day-button i.is-investment_funding_transfer, .cashbook-day-button i.is-investment_recovery_transfer { background: var(--warning); }
+.cashbook-day-button i.is-transfer, .cashbook-day-button i.is-exchange, .cashbook-day-button i.is-credit_card_payment { background: var(--warning); }
+.cashbook-day-button i.is-investment_funding_transfer { background: var(--investment-funding); }
+.cashbook-day-button i.is-investment_recovery_transfer { background: var(--investment-recovery); }
 .cashbook-day-button i.is-usd { background: #84b7ff; }
 .cashbook-day-button.is-selected i { box-shadow: 0 0 0 1px rgba(7, 16, 11, 0.4); }
 .cashbook-day-card { padding: 17px 16px 0; background: rgba(8, 17, 11, 0.85); }
@@ -412,11 +416,15 @@ input::placeholder { color: #53645a; }
 .cashbook-entry-type.is-expense { color: var(--negative); background: rgba(255, 118, 139, 0.08); }
 .cashbook-entry-type.is-income { color: var(--positive); background: rgba(109, 239, 156, 0.08); }
 .cashbook-entry-type.is-transfer { color: var(--warning); background: rgba(255, 202, 103, 0.08); }
+.cashbook-entry-type.is-funding { color: var(--investment-funding); background: rgba(138, 184, 255, 0.08); }
+.cashbook-entry-type.is-recovery { color: var(--investment-recovery); background: rgba(89, 215, 196, 0.08); }
 .cashbook-entry-value { max-width: 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font: 700 14px/1.25 var(--mono); }
 .cashbook-entry-value small { display: block; margin-top: 5px; color: var(--muted); font: 9px/1 var(--sans); }
 .cashbook-entry-row.is-expense .cashbook-entry-value { color: var(--negative); }
 .cashbook-entry-row.is-income .cashbook-entry-value { color: var(--positive); }
 .cashbook-entry-row.is-transfer .cashbook-entry-value { color: var(--warning); }
+.cashbook-entry-row.is-funding .cashbook-entry-value { color: var(--investment-funding); }
+.cashbook-entry-row.is-recovery .cashbook-entry-value { color: var(--investment-recovery); }
 .cashbook-accounts-view { margin-inline: -16px; border-block: 1px solid var(--line); background: rgba(8, 17, 11, 0.85); }
 .cashbook-account-group + .cashbook-account-group { margin-top: 18px; }
 .cashbook-account-group-title { display: flex; justify-content: space-between; padding: 12px 16px 8px; color: var(--muted); font-size: 12px; }

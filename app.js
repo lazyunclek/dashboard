@@ -790,6 +790,14 @@ const cashbookAccountTypeLabels = {
 const cashbookAssetClassLabels = { crypto: "虛擬貨幣", tw_equity: "台股", us_equity: "美股", real_estate: "房地產" };
 const usdEquivalentCurrencies = new Set(["USD", "USDC", "USDT"]);
 
+function cashbookEntryTone(eventType) {
+  if (eventType === "expense") return "is-expense";
+  if (eventType === "income") return "is-income";
+  if (eventType === "investment_funding_transfer") return "is-funding";
+  if (eventType === "investment_recovery_transfer") return "is-recovery";
+  return "is-transfer";
+}
+
 function localDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -984,7 +992,7 @@ function renderCashbookDay() {
   for (const row of rows) {
     const item = document.createElement("button");
     item.type = "button";
-    const tone = row.event_type === "expense" ? "is-expense" : row.event_type === "income" ? "is-income" : "is-transfer";
+    const tone = cashbookEntryTone(row.event_type);
     item.className = `cashbook-entry-row ${tone}`;
     item.dataset.cashbookEventId = row.id;
     const label = cashbookTypeLabels[row.event_type] || row.event_type;
