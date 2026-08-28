@@ -25,6 +25,9 @@ for (const token of ["data-asset-ledger", "data-transaction-type", "transactionA
 for (const token of ["position-return", "pnlPercent", "unrealizedPnlPct.toFixed(2)"]) {
   if (!app.includes(token)) throw new Error(`Missing visible position return percentage: ${token}`);
 }
+for (const behavior of ["positionExpandedIds", "details.open = state.positionExpandedIds.has(position.id)", "details.addEventListener(\"toggle\""]) {
+  if (!app.includes(behavior)) throw new Error(`Missing expanded-position state preservation: ${behavior}`);
+}
 for (const token of ["持倉均價", "累計買入均價", "累計賣出均價", "function weightedTradePrice", "buyAveragePrice", "sellAveragePrice"]) {
   if (!app.includes(token)) throw new Error(`Missing position average-price detail: ${token}`);
 }

@@ -22,6 +22,7 @@ const state = {
   marketFilter: "all",
   positionStatus: "open",
   positionCurrency: "TWD",
+  positionExpandedIds: new Set(),
   transactionAssetId: "",
   transactionQuery: "",
   transactionType: "all",
@@ -690,6 +691,7 @@ function spotPositionKey(symbol) {
 function positionCard(position) {
   const details = document.createElement("details");
   details.className = "position-card";
+  details.open = state.positionExpandedIds.has(position.id);
   const isClosed = Boolean(position.isClosed);
   const usesUsd = state.positionCurrency === "USD" && position.assetClass === "us_equity" && position.tradeCurrency === "USD";
   const displayCurrency = usesUsd ? "USD" : "TWD";
@@ -742,6 +744,10 @@ function positionCard(position) {
     <div class="position-ledger-actions" aria-label="${escapeHtml(position.displaySymbol)} 成交紀錄篩選">
       ${ledgerActions}
     </div>`;
+  details.addEventListener("toggle", () => {
+    if (details.open) state.positionExpandedIds.add(position.id);
+    else state.positionExpandedIds.delete(position.id);
+  });
   return details;
 }
 
