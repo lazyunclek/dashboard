@@ -31,7 +31,7 @@ for (const behavior of ["positionExpandedIds", "details.open = state.positionExp
 for (const token of ["持倉均價", "累計買入均價", "累計賣出均價", "function weightedTradePrice", "buyAveragePrice", "sellAveragePrice"]) {
   if (!app.includes(token)) throw new Error(`Missing position average-price detail: ${token}`);
 }
-for (const token of ["function transactionCashflow", "function transactionCashflowLabel", "function transactionCharges", "每股", "買入金額", "賣出金額", "費用合計", "實付", "實收", "transaction-gross", "transaction-charge-total", "transaction-cashflow"]) {
+for (const token of ["function transactionCashflow", "function transactionCashflowLabel", "function transactionCharges", "function holdingAverageChangesByAsset", "source_row_id", "持倉均價 前", "每股", "買入金額", "賣出金額", "費用合計", "實付", "實收", "transaction-holding-average", "transaction-gross", "transaction-charge-total", "transaction-cashflow"]) {
   if (!app.includes(token)) throw new Error(`Missing per-transaction cashflow detail: ${token}`);
 }
 for (const token of ["未實現損益", "已實現合計", "const realizedTotal"]) {

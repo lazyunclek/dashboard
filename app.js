@@ -218,6 +218,49 @@ function transactionCashflowLabel(row) {
   return `淨現金流 ${money(cashflow, row.settlement_currency, true)}`;
 }
 
+function holdingAverageChangesByAsset(rows) {
+  const changes = new Map();
+  const rowsByAsset = new Map();
+  for (const row of rows) {
+    const assetRows = rowsByAsset.get(row.asset_id) || [];
+    assetRows.push(row);
+    rowsByAsset.set(row.asset_id, assetRows);
+  }
+  for (const assetRows of rowsByAsset.values()) {
+    const average = (quantityNow, boughtCost, soldProceeds) => quantityNow > 0 ? Math.max(0, boughtCost - soldProceeds) / quantityNow : null;
+    const sourceBuys = new Map();
+    let quantityNow = 0;
+    let boughtCost = 0;
+    let soldProceeds = 0;
+    const ordered = [...assetRows].sort((a, b) => String(a.trade_date).localeCompare(String(b.trade_date)) || String(a.id).localeCompare(String(b.id)));
+    for (const row of ordered) {
+      const rowQuantity = num(row.quantity);
+      if (row.transaction_type === "buy") {
+        const before = average(quantityNow, boughtCost, soldProceeds);
+        const paid = row.net_cash_amount !== null && row.net_cash_amount !== undefined
+          ? Math.abs(num(row.net_cash_amount))
+          : Math.abs(num(row.gross_amount)) + transactionCharges(row);
+        quantityNow += rowQuantity;
+        boughtCost += paid;
+        changes.set(row.id, { before, after: average(quantityNow, boughtCost, soldProceeds) });
+        if (row.source_row_id !== null && row.source_row_id !== undefined) sourceBuys.set(String(row.source_row_id), row.id);
+      } else if (row.transaction_type === "sell") {
+        quantityNow -= rowQuantity;
+        soldProceeds += num(row.net_cash_amount ?? row.gross_amount);
+      } else if (["transfer_in", "adjustment"].includes(row.transaction_type)) {
+        quantityNow += rowQuantity;
+      } else if (row.details?.event_role === "asset_fee") {
+        quantityNow -= rowQuantity;
+        const linkedBuyId = row.source_row_id === null || row.source_row_id === undefined ? null : sourceBuys.get(String(row.source_row_id));
+        if (linkedBuyId && changes.has(linkedBuyId)) changes.get(linkedBuyId).after = average(quantityNow, boughtCost, soldProceeds);
+      } else if (row.transaction_type === "transfer_out") {
+        quantityNow -= rowQuantity;
+      }
+    }
+  }
+  return changes;
+}
+
 function shortDate(value) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("zh-TW", { month: "2-digit", day: "2-digit" }).format(new Date(`${String(value).slice(0, 10)}T00:00:00`));
@@ -657,7 +700,7 @@ async function loadDashboard() {
     const filter = `portfolio_id=eq.${encodeURIComponent(portfolioId)}`;
     const [assets, transactions, incomeEvents, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents] = await Promise.all([
       fetchAll(`investment_assets?select=id,portfolio_id,symbol,name,asset_class,market,quote_currency,quantity_unit,quantity_scale,price_scale,amount_scale,metadata&${filter}&order=symbol.asc`),
-      fetchAll(`investment_transactions?select=id,portfolio_id,account_id,asset_id,transaction_type,trade_date,quantity,unit_price,gross_amount,fee_amount,tax_amount,net_cash_amount,settlement_currency,status,details,created_at,updated_at&status=neq.voided&${filter}&order=trade_date.desc,created_at.desc`),
+      fetchAll(`investment_transactions?select=id,portfolio_id,account_id,asset_id,transaction_type,trade_date,quantity,unit_price,gross_amount,fee_amount,tax_amount,net_cash_amount,settlement_currency,source_row_id,status,details,created_at,updated_at&status=neq.voided&${filter}&order=trade_date.desc,created_at.desc`),
       fetchAll(`investment_income_events?select=id,portfolio_id,account_id,asset_id,income_type,event_date,gross_amount,withholding_tax,fee_amount,net_amount,currency,status,details,created_at,updated_at&status=neq.voided&${filter}&order=event_date.desc,created_at.desc`),
       fetchAll(`investment_portfolio_component_values?select=id,portfolio_id,component_key,component_type,asset_class,market,symbol,name,quantity,quantity_unit,native_currency,latest_price,cost_twd,gross_value_twd,liability_twd,net_value_twd,realized_pnl_twd,unrealized_pnl_twd,income_twd,included_in_total,included_in_financial,source_system,source_updated_at,data_status,metadata&${filter}&order=component_key.asc`),
       fetchAll(`investment_grid_records?select=id,portfolio_id,record_state,symbol,status,investment_usdt,realized_pnl,source_updated_at&${filter}&order=source_updated_at.desc`),
@@ -1354,6 +1397,7 @@ function renderPositions() {
 }
 
 function renderActivity() {
+  const holdingAverageChanges = holdingAverageChangesByAsset(state.data.transactions);
   const query = state.transactionQuery.trim().toLocaleLowerCase("zh-Hant");
   const transactions = state.data.transactions.filter((row) => {
     if (row.details?.event_role === "asset_fee") return false;
@@ -1381,10 +1425,14 @@ function renderActivity() {
     const grossAmount = Math.abs(num(row.gross_amount));
     const charges = transactionCharges(row);
     const grossLabel = isSell ? "賣出金額" : row.transaction_type === "buy" ? "買入金額" : "交易金額";
+    const holdingAverageChange = holdingAverageChanges.get(row.id);
+    const holdingAverageLabel = holdingAverageChange
+      ? `持倉均價 前 ${holdingAverageChange.before === null ? "—" : perSharePrice(holdingAverageChange.before, row.settlement_currency, asset.asset_class)} → 後 ${perSharePrice(holdingAverageChange.after, row.settlement_currency, asset.asset_class)}`
+      : "";
     item.innerHTML = `
       <span class="transaction-type ${isSell ? "is-sell" : ""}">${escapeHtml(label)}</span>
       <span class="transaction-copy"><strong>${escapeHtml(asset.symbol || "—")} · ${escapeHtml(asset.name || "未命名標的")}</strong><small>${shortDate(row.trade_date)} · ${escapeHtml(row.settlement_currency)}</small><small class="transaction-costs private-number">手續費 ${money(row.fee_amount || 0, row.settlement_currency)} · 稅 ${money(row.tax_amount || 0, row.settlement_currency)}</small></span>
-      <span class="transaction-amount"><strong class="private-number">${quantity(row.quantity, asset.quantity_scale)} ${escapeHtml(asset.quantity_unit || "")}</strong><small class="private-number">每股 ${row.unit_price === null ? "無" : perSharePrice(row.unit_price, row.settlement_currency, asset.asset_class)}</small><small class="transaction-gross private-number">${grossLabel} ${money(grossAmount, row.settlement_currency)}</small><small class="transaction-charge-total private-number">費用合計 ${money(charges, row.settlement_currency)}</small><small class="transaction-cashflow private-number">${transactionCashflowLabel(row)}</small></span>`;
+      <span class="transaction-amount"><strong class="private-number">${quantity(row.quantity, asset.quantity_scale)} ${escapeHtml(asset.quantity_unit || "")}</strong><small class="private-number">每股 ${row.unit_price === null ? "無" : perSharePrice(row.unit_price, row.settlement_currency, asset.asset_class)}</small>${holdingAverageLabel ? `<small class="transaction-holding-average private-number">${escapeHtml(holdingAverageLabel)}</small>` : ""}<small class="transaction-gross private-number">${grossLabel} ${money(grossAmount, row.settlement_currency)}</small><small class="transaction-charge-total private-number">費用合計 ${money(charges, row.settlement_currency)}</small><small class="transaction-cashflow private-number">${transactionCashflowLabel(row)}</small></span>`;
     transactionList.append(item);
   }
   if (!transactions.length) transactionList.innerHTML = '<div class="empty-state">目前沒有交易紀錄</div>';
