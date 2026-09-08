@@ -28,6 +28,9 @@ for (const token of ["pnlPercent", "unrealizedPnlPct.toFixed(2)"]) {
 for (const behavior of ["positionExpandedIds", "details.open = state.positionExpandedIds.has(position.id)", "details.addEventListener(\"toggle\""]) {
   if (!app.includes(behavior)) throw new Error(`Missing expanded-position state preservation: ${behavior}`);
 }
+for (const behavior of ["function supportsDollarDisplay", 'position.assetClass === "crypto"', '["USD", "USDT", "USDC"].includes(position.tradeCurrency)', "usesNativeDollar"]) {
+  if (!app.includes(behavior)) throw new Error(`Missing native currency display behavior: ${behavior}`);
+}
 for (const token of ["持倉均價", "累計買入均價", "累計賣出均價", "function weightedTradePrice", "buyAveragePrice", "sellAveragePrice"]) {
   if (!app.includes(token)) throw new Error(`Missing position average-price detail: ${token}`);
 }

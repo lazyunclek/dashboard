@@ -731,18 +731,25 @@ function spotPositionKey(symbol) {
   return String(symbol || "").toUpperCase().replace(/-(?:USD|USDT|USDC)$/, "");
 }
 
+function supportsDollarDisplay(position) {
+  if (position.assetClass === "us_equity") return position.tradeCurrency === "USD";
+  return position.assetClass === "crypto"
+    && ["USD", "USDT", "USDC"].includes(position.tradeCurrency)
+    && position.marketPriceCurrency === position.tradeCurrency;
+}
+
 function positionCard(position) {
   const details = document.createElement("details");
   details.className = "position-card";
   details.open = state.positionExpandedIds.has(position.id);
   const isClosed = Boolean(position.isClosed);
-  const usesUsd = state.positionCurrency === "USD" && position.assetClass === "us_equity" && position.tradeCurrency === "USD";
-  const displayCurrency = usesUsd ? "USD" : "TWD";
+  const usesNativeDollar = state.positionCurrency === "USD" && supportsDollarDisplay(position);
+  const displayCurrency = usesNativeDollar ? position.tradeCurrency : "TWD";
   const pnl = num(position.unrealizedPnlTwd);
   const hasPnl = position.marketValueTwd !== null && position.unrealizedPnlTwd !== null;
   const nativePnl = position.unrealizedPnlNative;
-  const pnlAmount = usesUsd
-    ? money(nativePnl, "USD", true)
+  const pnlAmount = usesNativeDollar
+    ? money(nativePnl, displayCurrency, true)
     : hasPnl ? money(pnl, "TWD", true) : "—";
   const pnlPercent = position.unrealizedPnlPct === null
     ? "—"
@@ -755,8 +762,8 @@ function positionCard(position) {
   const totalPnlNative = isClosed ? realizedTotalNative : realizedTotalNative + num(nativePnl);
   const totalPnlTone = totalPnl > 0 ? "is-positive" : totalPnl < 0 ? "is-negative" : "";
   const summaryValue = isClosed
-    ? usesUsd ? position.soldProceedsNative : position.soldProceedsTwd
-    : usesUsd ? position.marketValueNative : position.marketValueTwd;
+    ? usesNativeDollar ? position.soldProceedsNative : position.soldProceedsTwd
+    : usesNativeDollar ? position.marketValueNative : position.marketValueTwd;
   const summaryValueLabel = isClosed ? "累計賣出實收" : "目前市值";
   const openAverageCost = perSharePrice(position.averageCost, position.quoteCurrency, position.assetClass);
   const ledgerTransactions = state.data.transactions.filter((row) => row.asset_id === position.id && row.details?.event_role !== "asset_fee");
@@ -780,7 +787,7 @@ function positionCard(position) {
         </span>
         <span class="position-summary-metric position-total-pnl ${totalPnlTone}">
           <small>總損益</small>
-          <strong class="private-number">${money(usesUsd ? totalPnlNative : totalPnl, displayCurrency, true)}</strong>
+          <strong class="private-number">${money(usesNativeDollar ? totalPnlNative : totalPnl, displayCurrency, true)}</strong>
         </span>
       </span>
     </summary>
@@ -789,12 +796,12 @@ function positionCard(position) {
       <span class="position-detail"><span>${isClosed ? "當初購買均價" : "持倉均價"}</span><strong class="private-number">${isClosed ? perSharePrice(position.buyAveragePrice, position.quoteCurrency, position.assetClass) : openAverageCost}</strong></span>
       <span class="position-detail"><span>${isClosed ? "出清均價" : "最新價格"}</span><strong class="private-number">${perSharePrice(isClosed ? position.sellAveragePrice : position.marketPrice, isClosed ? position.quoteCurrency : position.marketPriceCurrency, position.assetClass)}${!isClosed && position.marketPriceStatus === "stale" ? '<small class="price-status is-stale">行情過期</small>' : ""}</strong></span>
       <span class="position-detail"><span>累計買入均價</span><strong class="private-number">${perSharePrice(position.buyAveragePrice, position.quoteCurrency, position.assetClass)}</strong></span>
-      <span class="position-detail"><span>${isClosed ? "累計買入實付" : "剩餘成本"}</span><strong class="private-number">${money(usesUsd ? (isClosed ? position.boughtCostNative : position.costNative) : (isClosed ? position.boughtCostTwd : position.costTwd), displayCurrency)}</strong></span>
+      <span class="position-detail"><span>${isClosed ? "累計買入實付" : "剩餘成本"}</span><strong class="private-number">${money(usesNativeDollar ? (isClosed ? position.boughtCostNative : position.costNative) : (isClosed ? position.boughtCostTwd : position.costTwd), displayCurrency)}</strong></span>
       <span class="position-detail"><span>累計賣出均價</span><strong class="private-number">${perSharePrice(position.sellAveragePrice, position.quoteCurrency, position.assetClass)}</strong></span>
-      <span class="position-detail"><span>${isClosed ? "累計賣出實收" : "未實現損益"}</span><strong class="private-number ${isClosed ? realizedTone : pnlTone}">${isClosed ? money(usesUsd ? position.soldProceedsNative : position.soldProceedsTwd, displayCurrency) : usesUsd ? money(nativePnl, "USD", true) : hasPnl ? money(pnl, "TWD", true) : "—"}</strong></span>
+      <span class="position-detail"><span>${isClosed ? "累計賣出實收" : "未實現損益"}</span><strong class="private-number ${isClosed ? realizedTone : pnlTone}">${isClosed ? money(usesNativeDollar ? position.soldProceedsNative : position.soldProceedsTwd, displayCurrency) : usesNativeDollar ? money(nativePnl, displayCurrency, true) : hasPnl ? money(pnl, "TWD", true) : "—"}</strong></span>
       <span class="position-detail"><span>${isClosed ? "清倉日期" : "未實現報酬"}</span><strong class="private-number ${pnlTone}">${isClosed ? dateTime(position.lastTransactionDate) : position.unrealizedPnlPct === null ? "零成本／待補" : pnlPercent}</strong></span>
-      <span class="position-detail"><span>已實現合計</span><strong class="private-number ${realizedTone}">${money(usesUsd ? realizedTotalNative : realizedTotal, displayCurrency, true)}</strong></span>
-      <span class="position-detail"><span>總損益</span><strong class="private-number ${totalPnlTone}">${money(usesUsd ? totalPnlNative : totalPnl, displayCurrency, true)}</strong></span>
+      <span class="position-detail"><span>已實現合計</span><strong class="private-number ${realizedTone}">${money(usesNativeDollar ? realizedTotalNative : realizedTotal, displayCurrency, true)}</strong></span>
+      <span class="position-detail"><span>總損益</span><strong class="private-number ${totalPnlTone}">${money(usesNativeDollar ? totalPnlNative : totalPnl, displayCurrency, true)}</strong></span>
       <span class="position-detail"><span>主題</span><strong>${escapeHtml(position.subTheme)}</strong></span>
       <span class="position-detail"><span>行情時間</span><strong>${dateTime(position.marketPriceAt)}</strong></span>
     </div>
