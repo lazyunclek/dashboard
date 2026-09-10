@@ -298,6 +298,10 @@ function setTone(element, value) {
 
 function movingLedger(rows) {
   let quantityNow = 0;
+  // Keep the portfolio-level quantity as a signed total.  A transfer-out or
+  // native-asset fee can be recorded before its matching transfer-in/buy on
+  // the same day; clipping that intermediate reduction to zero loses it.
+  let netQuantity = 0;
   let remainingCost = 0;
   let boughtQuantity = 0;
   let boughtCost = 0;
@@ -313,6 +317,7 @@ function movingLedger(rows) {
     if (row.transaction_type === "buy") {
       const paid = row.net_cash_amount !== null ? Math.abs(num(row.net_cash_amount)) : Math.abs(num(row.gross_amount)) + num(row.fee_amount) + num(row.tax_amount);
       quantityNow += rowQuantity;
+      netQuantity += rowQuantity;
       remainingCost += paid;
       boughtQuantity += rowQuantity;
       boughtCost += paid;
@@ -320,6 +325,7 @@ function movingLedger(rows) {
       const reduction = Math.min(rowQuantity, Math.max(0, quantityNow));
       const average = quantityNow > 0 ? remainingCost / quantityNow : 0;
       quantityNow -= reduction;
+      netQuantity -= rowQuantity;
       remainingCost -= reduction * average;
       soldQuantity += rowQuantity;
       soldProceeds += row.net_cash_amount !== null ? num(row.net_cash_amount) : num(row.gross_amount) - num(row.fee_amount) - num(row.tax_amount);
@@ -327,20 +333,23 @@ function movingLedger(rows) {
       const reduction = Math.min(rowQuantity, Math.max(0, quantityNow));
       const average = quantityNow > 0 ? remainingCost / quantityNow : 0;
       quantityNow -= reduction;
+      netQuantity -= rowQuantity;
       remainingCost -= reduction * average;
     } else if (["transfer_in", "adjustment"].includes(row.transaction_type)) {
       quantityNow += rowQuantity;
+      netQuantity += rowQuantity;
     } else if (row.transaction_type === "transfer_out") {
       const reduction = Math.min(rowQuantity, Math.max(0, quantityNow));
       const average = quantityNow > 0 ? remainingCost / quantityNow : 0;
       quantityNow -= reduction;
+      netQuantity -= rowQuantity;
       remainingCost -= reduction * average;
     }
   }
   const tolerance = 1e-10;
-  const isClosed = Math.abs(quantityNow) < tolerance;
+  const isClosed = Math.abs(netQuantity) < tolerance;
   return {
-    quantity: isClosed ? 0 : quantityNow,
+    quantity: isClosed ? 0 : netQuantity,
     remainingCost: isClosed ? 0 : Math.max(0, boughtCost - soldProceeds),
     boughtQuantity,
     boughtCost,
