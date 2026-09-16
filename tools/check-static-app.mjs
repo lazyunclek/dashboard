@@ -15,7 +15,7 @@ const [html, css, app, config, workflow] = await Promise.all([
   fs.readFile(path.join(root, ".github/workflows/pages.yml"), "utf8")
 ]);
 
-for (const token of ["login-view", "dashboard-view", "positions-list", "transaction-search", "transaction-filters", "transaction-list", "current-cash", "running-grid-count", "cashbook-panel", "cashbook-calendar-grid", "cashbook-entry-list", "cashbook-day-expense", "cashbook-week-expense", "cashbook-month-expense", "cashbook-form"]) {
+for (const token of ["login-view", "dashboard-view", "positions-list", "transaction-search", "transaction-filters", "transaction-list", "current-cash", "running-grid-count", "cashbook-panel", "cashbook-calendar-grid", "cashbook-entry-list", "cashbook-day-expense", "cashbook-week-expense", "cashbook-month-expense", "cashbook-form", "cashbook-scheduled-view", "cashbook-schedule-form", "cashbook-account-form"]) {
   if (!html.includes(`id="${token}"`)) throw new Error(`Missing HTML target: ${token}`);
 }
 if (html.includes('id="top-positions"') || html.includes("主要持倉")) throw new Error("Overview must not duplicate the positions list");
@@ -66,14 +66,14 @@ if (/service[_-]?role|SUPABASE_SERVICE_ROLE|secret[_-]?key/i.test(`${app}\n${con
 if (/method:\s*["'](?:PATCH|PUT|DELETE)["']/i.test(app)) throw new Error("Investment mutation method found");
 const postCalls = [...app.matchAll(/method:\s*["']POST["']/gi)].length;
 if (postCalls !== 2 || !app.includes("/auth/v1/token") || !app.includes("/rest/v1/rpc/${name}")) throw new Error("Only Auth and the controlled cashbook RPC wrapper may use POST");
-for (const rpc of ["cashbook_ensure_defaults", "cashbook_event_save", "cashbook_event_delete"]) {
+for (const rpc of ["cashbook_ensure_defaults", "cashbook_event_save", "cashbook_event_delete", "cashbook_schedule_save", "cashbook_schedule_post", "cashbook_schedule_cancel", "cashbook_account_setup", "cashbook_account_update", "cashbook_account_reconcile"]) {
   if (!app.includes(`"${rpc}"`)) throw new Error(`Missing allowed cashbook RPC: ${rpc}`);
 }
 if (!app.includes("cashbookRpcNames.has(name)")) throw new Error("Cashbook RPC allowlist enforcement missing");
-for (const source of ["cashbook_accounts", "cashbook_account_balances", "cashbook_categories", "cashbook_ledger", "cashbook_events"]) {
+for (const source of ["cashbook_accounts", "cashbook_account_balances", "cashbook_categories", "cashbook_ledger", "cashbook_events", "cashbook_schedules", "cashbook_schedule_runs"]) {
   if (!app.includes(source)) throw new Error(`Missing cashbook read source: ${source}`);
 }
-for (const behavior of ["armedDate", "openCashbookForm", "saveCashbookEvent", "loadCashbook", "investment_mobile", "property_cost_recovery"]) {
+for (const behavior of ["armedDate", "openCashbookForm", "saveCashbookEvent", "loadCashbook", "investment_mobile", "property_cost_recovery", "openScheduleSheet", "saveSchedule", "openAccountSheet", "saveAccount"]) {
   if (!app.includes(behavior)) throw new Error(`Missing mobile cashbook behavior: ${behavior}`);
 }
 for (const behavior of ['activeTab: "cashbook"', "renderCashbookSummaries", "cashbookExpenseTwd", "row.note"]) {

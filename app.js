@@ -33,6 +33,8 @@ const state = {
     categories: [],
     ledger: [],
     events: [],
+    schedules: [],
+    scheduleRuns: [],
     loaded: false,
     loading: false,
     month: new Date().toISOString().slice(0, 7),
@@ -122,7 +124,7 @@ async function rest(path, options = {}, retried = false) {
   return payload;
 }
 
-const cashbookRpcNames = new Set(["cashbook_ensure_defaults", "cashbook_event_save", "cashbook_event_delete"]);
+const cashbookRpcNames = new Set(["cashbook_ensure_defaults", "cashbook_event_save", "cashbook_event_delete", "cashbook_schedule_save", "cashbook_schedule_post", "cashbook_schedule_cancel", "cashbook_account_setup", "cashbook_account_update", "cashbook_account_reconcile"]);
 
 async function cashbookRpc(name, body = {}, retried = false) {
   if (!cashbookRpcNames.has(name)) throw new Error("不允許的日常帳本操作");
@@ -922,12 +924,14 @@ async function loadCashbook() {
     rangeEnd.setDate(rangeEnd.getDate() + (7 - rangeEnd.getDay()) % 7);
     const queryStart = localDateKey(rangeStart);
     const queryEnd = localDateKey(rangeEnd);
-    const [accountRows, balanceRows, categories, ledger, events] = await Promise.all([
+    const [accountRows, balanceRows, categories, ledger, events, schedules, scheduleRuns] = await Promise.all([
       fetchAll("cashbook_accounts?select=*&order=status.asc,name.asc"),
       fetchAll("cashbook_account_balances?select=*&order=status.asc,name.asc"),
       fetchAll("cashbook_categories?select=*&order=category_type.asc,sort_order.asc,name.asc"),
       fetchAll(`cashbook_ledger?select=*&occurred_on=gte.${queryStart}&occurred_on=lt.${queryEnd}&order=occurred_on.desc,created_at.desc&limit=500`),
-      fetchAll(`cashbook_events?select=id,source_payload&occurred_on=gte.${queryStart}&occurred_on=lt.${queryEnd}&order=occurred_on.desc,created_at.desc&limit=500`)
+      fetchAll(`cashbook_events?select=id,source_payload&occurred_on=gte.${queryStart}&occurred_on=lt.${queryEnd}&order=occurred_on.desc,created_at.desc&limit=500`),
+      fetchAll("cashbook_schedules?select=*&order=next_due_on.asc.nullslast,created_at.asc"),
+      fetchAll("cashbook_schedule_runs?select=*&order=due_on.desc&limit=100")
     ]);
     const balanceById = new Map(balanceRows.map((row) => [row.account_id, row]));
     const payloadById = new Map(events.map((row) => [row.id, row.source_payload || {}]));
@@ -939,6 +943,8 @@ async function loadCashbook() {
     state.cashbook.categories = categories;
     state.cashbook.ledger = ledger.map((row) => ({ ...row, source_payload: payloadById.get(row.id) || {} }));
     state.cashbook.events = events;
+    state.cashbook.schedules = schedules;
+    state.cashbook.scheduleRuns = scheduleRuns;
     state.cashbook.loaded = true;
     renderCashbook();
   } catch (error) {
@@ -973,8 +979,10 @@ function renderCashbookAccounts() {
       : `${rows.length} 個帳戶`;
     section.innerHTML = `<div class="cashbook-account-group-title"><span>${escapeHtml(title)}</span><strong class="private-number">${escapeHtml(summary)}</strong></div>`;
     for (const account of rows) {
-      const row = document.createElement("article");
+      const row = document.createElement("button");
+      row.type = "button";
       row.className = `cashbook-account-row ${num(account.balance) < 0 ? "is-negative" : ""}`;
+      row.dataset.cashbookAccountId = account.id;
       const accountKind = account.account_type === "asset_cost"
         ? cashbookAssetClassLabels[account.asset_class] || "資產成本"
         : cashbookAccountTypeLabels[account.account_type] || account.account_type;
@@ -985,10 +993,37 @@ function renderCashbookAccounts() {
   }
 }
 
+function scheduleLabel(row) {
+  if (row.schedule_type === "undated") return "日期未定 · 手動入帳";
+  if (row.schedule_type === "monthly_day") return `每月 ${row.monthly_day} 日`;
+  if (row.schedule_type === "monthly_nth_weekday") return `每月第 ${row.monthly_ordinal} 個週${["", "一", "二", "三", "四", "五", "六", "日"][row.monthly_weekday]}`;
+  return row.next_due_on ? `預計 ${row.next_due_on}` : "單次款項";
+}
+
+function renderCashbookSchedules() {
+  const list = byId("cashbook-schedule-list");
+  list.replaceChildren();
+  const rows = state.cashbook.schedules.filter((row) => ["active", "paused"].includes(row.status));
+  if (!rows.length) { list.innerHTML = '<div class="empty-state">尚未建立預定款項。預定只提示未來現金流，不會先扣減餘額。</div>'; return; }
+  const today = localDateKey();
+  for (const schedule of rows) {
+    const source = cashbookAccount(schedule.source_account_id);
+    const destination = cashbookAccount(schedule.destination_account_id);
+    const item = document.createElement("button");
+    item.type = "button";
+    item.dataset.cashbookScheduleId = schedule.id;
+    item.className = `cashbook-account-row cashbook-schedule-row ${schedule.next_due_on && schedule.next_due_on < today ? "is-overdue" : ""}`;
+    const flow = schedule.event_type === "expense" ? source?.name || "未指定帳戶" : `${source?.name || "未指定帳戶"} → ${destination?.name || "未指定帳戶"}`;
+    item.innerHTML = `<span class="cashbook-account-copy"><strong>${escapeHtml(schedule.title)}</strong><small class="schedule-date">${escapeHtml(scheduleLabel(schedule))} · ${schedule.auto_post ? "到期自動入帳" : "待你確認"}</small><small>${escapeHtml(flow)}${schedule.note ? ` · ${escapeHtml(schedule.note)}` : ""}</small></span><b class="cashbook-account-balance private-number">${cashbookMoney(schedule.amount, schedule.currency)}</b>`;
+    list.append(item);
+  }
+}
+
 function showCashbookView(viewName) {
-  state.cashbook.view = viewName === "accounts" ? "accounts" : "ledger";
+  state.cashbook.view = ["accounts", "scheduled"].includes(viewName) ? viewName : "ledger";
   byId("cashbook-ledger-view").hidden = state.cashbook.view !== "ledger";
   byId("cashbook-accounts-view").hidden = state.cashbook.view !== "accounts";
+  byId("cashbook-scheduled-view").hidden = state.cashbook.view !== "scheduled";
   document.querySelectorAll("[data-cashbook-view]").forEach((button) => button.classList.toggle("is-active", button.dataset.cashbookView === state.cashbook.view));
 }
 
@@ -1112,6 +1147,7 @@ function renderCashbookSummaries() {
 
 function renderCashbook() {
   renderCashbookAccounts();
+  renderCashbookSchedules();
   renderCashbookCalendar();
   renderCashbookSummaries();
   renderCashbookDay();
@@ -1302,6 +1338,90 @@ function closeCashbookForm() {
   document.body.style.top = "";
   window.scrollTo({ top: state.sheetScrollY, behavior: "auto" });
   state.cashbook.editingEvent = null;
+}
+
+function openSheet(id) { byId(id).hidden = false; document.body.classList.add("sheet-open"); }
+function closeSheet(id) { byId(id).hidden = true; if (byId("cashbook-sheet").hidden && byId("cashbook-schedule-sheet").hidden && byId("cashbook-account-sheet").hidden) document.body.classList.remove("sheet-open"); }
+
+function scheduleOptions(selected = {}) {
+  const normal = state.cashbook.accounts.filter((a) => a.status === "active" && !["asset_cost", "investment_bridge"].includes(a.account_type));
+  const destinations = state.cashbook.accounts.filter((a) => a.status === "active" && a.id !== selected.source_account_id && a.account_type !== "investment_bridge");
+  const expense = state.cashbook.categories.filter((c) => c.status === "active" && c.category_type === "expense");
+  byId("schedule-source").innerHTML = `<option value="">請選擇</option>${normal.map((a) => `<option value="${a.id}">${escapeHtml(a.name)} · ${a.currency}</option>`).join("")}`;
+  byId("schedule-destination").innerHTML = `<option value="">請選擇</option>${destinations.map((a) => `<option value="${a.id}">${escapeHtml(a.name)} · ${a.currency}</option>`).join("")}`;
+  byId("schedule-category").innerHTML = `<option value="">請選擇</option>${expense.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("")}`;
+  byId("schedule-source").value = selected.source_account_id || "";
+  byId("schedule-destination").value = selected.destination_account_id || "";
+  byId("schedule-category").value = selected.category_id || "";
+}
+
+function refreshScheduleFields() {
+  const type = byId("schedule-type").value;
+  const eventType = byId("schedule-event-type").value;
+  byId("schedule-date-field").hidden = type !== "one_time";
+  byId("schedule-month-day-field").hidden = type !== "monthly_day";
+  byId("schedule-nth-field").hidden = type !== "monthly_nth_weekday";
+  byId("schedule-weekday-field").hidden = type !== "monthly_nth_weekday";
+  byId("schedule-destination-field").hidden = eventType === "expense";
+  byId("schedule-category-field").hidden = !["expense", "investment_funding_transfer"].includes(eventType);
+  const categoryValue = byId("schedule-category").value;
+  const allowedCategories = state.cashbook.categories.filter((category) => category.status === "active" && (eventType === "expense" ? category.category_type === "expense" : eventType === "investment_funding_transfer" ? category.category_type === "balance" && category.name === "資產投入" : false));
+  if (["expense", "investment_funding_transfer"].includes(eventType)) { byId("schedule-category").innerHTML = `<option value="">請選擇</option>${allowedCategories.map((category) => `<option value="${category.id}">${escapeHtml(category.name)}</option>`).join("")}`; byId("schedule-category").value = categoryValue; }
+  if (type === "undated") { byId("schedule-auto-post").checked = false; byId("schedule-auto-post").disabled = true; } else byId("schedule-auto-post").disabled = false;
+}
+
+function openScheduleSheet(schedule = null) {
+  state.cashbook.editingSchedule = schedule;
+  byId("cashbook-schedule-title").textContent = schedule ? "編輯預定款項" : "新增預定款項";
+  scheduleOptions(schedule || {});
+  byId("schedule-name").value = schedule?.title || "";
+  byId("schedule-event-type").value = schedule?.event_type || "expense";
+  byId("schedule-amount").value = schedule?.amount || "";
+  byId("schedule-type").value = schedule?.schedule_type || "one_time";
+  byId("schedule-date").value = schedule?.due_on || schedule?.next_due_on || localDateKey();
+  byId("schedule-month-day").value = schedule?.monthly_day || new Date().getDate();
+  byId("schedule-nth").value = schedule?.monthly_ordinal || 1;
+  byId("schedule-weekday").value = schedule?.monthly_weekday || 1;
+  byId("schedule-auto-post").checked = schedule?.auto_post ?? true;
+  byId("schedule-note").value = schedule?.note || "";
+  byId("cashbook-schedule-cancel").hidden = !schedule;
+  byId("cashbook-schedule-status").textContent = "";
+  refreshScheduleFields(); openSheet("cashbook-schedule-sheet");
+}
+
+async function saveSchedule(event) {
+  event.preventDefault();
+  const editing = state.cashbook.editingSchedule;
+  const source = cashbookAccount(byId("schedule-source").value);
+  const status = byId("cashbook-schedule-status");
+  if (!source || !(num(byId("schedule-amount").value) > 0)) { status.textContent = "請選擇帳戶並輸入確定金額"; return; }
+  status.textContent = "儲存中…";
+  try {
+    const scheduleType = byId("schedule-type").value;
+    await cashbookRpc("cashbook_schedule_save", { p_id: editing?.id || null, p_title: byId("schedule-name").value.trim(), p_schedule_type: scheduleType, p_event_type: byId("schedule-event-type").value, p_amount: num(byId("schedule-amount").value), p_currency: source.currency, p_source_account_id: source.id, p_destination_account_id: byId("schedule-destination").value || null, p_category_id: byId("schedule-category").value || null, p_investment_target: cashbookAccount(byId("schedule-destination").value)?.asset_class || null, p_note: byId("schedule-note").value.trim() || null, p_due_on: scheduleType === "one_time" ? byId("schedule-date").value || null : null, p_monthly_day: scheduleType === "monthly_day" ? Number(byId("schedule-month-day").value) : null, p_monthly_ordinal: scheduleType === "monthly_nth_weekday" ? Number(byId("schedule-nth").value) : null, p_monthly_weekday: scheduleType === "monthly_nth_weekday" ? Number(byId("schedule-weekday").value) : null, p_auto_post: byId("schedule-auto-post").checked, p_status: "active" });
+    closeSheet("cashbook-schedule-sheet"); showToast(editing ? "預定款項已更新" : "預定款項已儲存"); await loadCashbook();
+  } catch (error) { status.textContent = error instanceof Error ? `儲存失敗：${error.message}` : "儲存失敗"; }
+}
+
+function openAccountSheet(account = null) {
+  state.cashbook.editingAccount = account;
+  byId("cashbook-account-title").textContent = account ? "帳戶明細與對帳" : "新增帳戶";
+  byId("account-name").value = account?.name || ""; byId("account-type").value = account?.account_type || "bank"; byId("account-currency").value = account?.currency || "TWD"; byId("account-institution").value = account?.institution || ""; byId("account-note").value = account?.note || ""; byId("account-opening").value = 0; byId("account-actual-balance").value = account?.balance ?? "";
+  byId("account-type-field").hidden = Boolean(account); byId("account-currency-field").hidden = Boolean(account); byId("account-opening-field").hidden = Boolean(account); byId("account-reconcile-field").hidden = !account;
+  byId("cashbook-account-status").textContent = account ? `目前帳本餘額：${cashbookMoney(account.balance, account.currency)}` : "";
+  openSheet("cashbook-account-sheet");
+}
+
+async function saveAccount(event) {
+  event.preventDefault(); const editing = state.cashbook.editingAccount; const status = byId("cashbook-account-status"); status.textContent = "儲存中…";
+  try {
+    if (editing) {
+      await cashbookRpc("cashbook_account_update", { p_id: editing.id, p_name: byId("account-name").value.trim(), p_institution: byId("account-institution").value.trim() || null, p_note: byId("account-note").value.trim() || null, p_status: "active" });
+      const actual = num(byId("account-actual-balance").value);
+      if (Number.isFinite(actual) && actual !== num(editing.balance)) await cashbookRpc("cashbook_account_reconcile", { p_account_id: editing.id, p_actual_balance: actual, p_note: "手機帳戶對帳" });
+    } else await cashbookRpc("cashbook_account_setup", { p_name: byId("account-name").value.trim(), p_account_type: byId("account-type").value, p_currency: byId("account-currency").value, p_institution: byId("account-institution").value.trim() || null, p_note: byId("account-note").value.trim() || null, p_opening_balance: num(byId("account-opening").value) || 0 });
+    closeSheet("cashbook-account-sheet"); showToast(editing ? "帳戶已更新" : "帳戶已建立"); await loadCashbook();
+  } catch (error) { status.textContent = error instanceof Error ? `儲存失敗：${error.message}` : "儲存失敗"; }
 }
 
 async function saveCashbookEvent(event) {
@@ -1758,6 +1878,10 @@ document.addEventListener("click", (event) => {
     if (record) openCashbookForm(record, record.occurred_on);
     return;
   }
+  const scheduleRow = event.target.closest("[data-cashbook-schedule-id]");
+  if (scheduleRow) { openScheduleSheet(state.cashbook.schedules.find((row) => row.id === scheduleRow.dataset.cashbookScheduleId) || null); return; }
+  const accountRow = event.target.closest("[data-cashbook-account-id]");
+  if (accountRow) { openAccountSheet(cashbookAccount(accountRow.dataset.cashbookAccountId)); return; }
   const button = event.target.closest("[data-asset-ledger]");
   if (!button) return;
   state.transactionAssetId = button.dataset.assetLedger || "";
@@ -1778,6 +1902,17 @@ byId("mobile-cashbook-add").addEventListener("click", async () => {
   if (state.cashbook.loaded) openCashbookForm();
 });
 document.querySelectorAll("[data-cashbook-view]").forEach((button) => button.addEventListener("click", () => showCashbookView(button.dataset.cashbookView)));
+byId("cashbook-add-schedule").addEventListener("click", () => openScheduleSheet());
+byId("cashbook-schedule-close").addEventListener("click", () => closeSheet("cashbook-schedule-sheet"));
+byId("cashbook-schedule-sheet").addEventListener("click", (event) => { if (event.target === byId("cashbook-schedule-sheet")) closeSheet("cashbook-schedule-sheet"); });
+byId("cashbook-schedule-form").addEventListener("submit", saveSchedule);
+byId("schedule-type").addEventListener("change", refreshScheduleFields);
+byId("schedule-event-type").addEventListener("change", refreshScheduleFields);
+byId("cashbook-schedule-cancel").addEventListener("click", async () => { const schedule = state.cashbook.editingSchedule; if (!schedule || !window.confirm("取消這筆預定款項？已發生帳目不會受影響。")) return; try { await cashbookRpc("cashbook_schedule_cancel", { p_id: schedule.id }); closeSheet("cashbook-schedule-sheet"); showToast("預定款項已取消"); await loadCashbook(); } catch (error) { byId("cashbook-schedule-status").textContent = error instanceof Error ? error.message : "取消失敗"; } });
+byId("cashbook-add-account").addEventListener("click", () => openAccountSheet());
+byId("cashbook-account-close").addEventListener("click", () => closeSheet("cashbook-account-sheet"));
+byId("cashbook-account-sheet").addEventListener("click", (event) => { if (event.target === byId("cashbook-account-sheet")) closeSheet("cashbook-account-sheet"); });
+byId("cashbook-account-form").addEventListener("submit", saveAccount);
 byId("cashbook-close-button").addEventListener("click", closeCashbookForm);
 byId("cashbook-sheet").addEventListener("click", (event) => { if (event.target === byId("cashbook-sheet")) closeCashbookForm(); });
 byId("cashbook-form").addEventListener("submit", saveCashbookEvent);

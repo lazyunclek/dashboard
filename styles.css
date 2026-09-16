@@ -370,7 +370,7 @@ input::placeholder { color: #53645a; }
 
 .compact-button { min-height: 40px; padding: 0 15px; white-space: nowrap; font-size: 12px; }
 .cashbook-title-row { align-items: flex-end; }
-.cashbook-view-switch { display: grid; grid-template-columns: repeat(2, 1fr); width: min(100%, 270px); margin: 0 auto; padding: 3px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--bg-deep); }
+.cashbook-view-switch { display: grid; grid-template-columns: repeat(3, 1fr); width: min(100%, 330px); margin: 0 auto; padding: 3px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--bg-deep); }
 .cashbook-view-switch button { min-height: 38px; border: 0; border-radius: 9px; color: var(--muted); background: transparent; font-size: 12px; font-weight: 750; cursor: pointer; }
 .cashbook-view-switch button.is-active { color: #07100b; background: var(--text); }
 .cashbook-ledger-view { display: grid; gap: 0; margin-inline: -16px; }
@@ -443,6 +443,13 @@ input::placeholder { color: #53645a; }
 .cashbook-account-copy small { margin-top: 6px; color: var(--muted); font: 12px/1 var(--mono); }
 .cashbook-account-balance { color: var(--positive); text-align: right; font: 650 16px/1.2 var(--mono); }
 .cashbook-account-row.is-negative .cashbook-account-balance { color: var(--negative); }
+.cashbook-account-row { width: 100%; border-inline: 0; text-align: left; }
+button.cashbook-account-row { cursor: pointer; }
+.cashbook-inline-action { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.cashbook-inline-action small { color: var(--muted); font-size: 10px; text-align: right; }
+.cashbook-schedule-row .cashbook-account-balance { color: var(--warning); }
+.cashbook-schedule-row.is-overdue .cashbook-account-balance { color: var(--negative); }
+.cashbook-schedule-row small.schedule-date { color: var(--accent); }
 
 @media (max-width: 679px) {
   .app-shell { max-width: 100%; overflow-x: clip; }
