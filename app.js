@@ -1393,12 +1393,15 @@ async function saveSchedule(event) {
   event.preventDefault();
   const editing = state.cashbook.editingSchedule;
   const source = cashbookAccount(byId("schedule-source").value);
+  const destination = cashbookAccount(byId("schedule-destination").value);
+  const eventType = byId("schedule-event-type").value;
   const status = byId("cashbook-schedule-status");
   if (!source || !(num(byId("schedule-amount").value) > 0)) { status.textContent = "請選擇帳戶並輸入確定金額"; return; }
+  if (eventType === "transfer" && destination?.account_type === "asset_cost") { status.textContent = "交屋／裝潢等轉入房地產成本帳戶，請選「資產投入」；實際付款時才會認列成本。"; return; }
   status.textContent = "儲存中…";
   try {
     const scheduleType = byId("schedule-type").value;
-    await cashbookRpc("cashbook_schedule_save", { p_id: editing?.id || null, p_title: byId("schedule-name").value.trim(), p_schedule_type: scheduleType, p_event_type: byId("schedule-event-type").value, p_amount: num(byId("schedule-amount").value), p_currency: source.currency, p_source_account_id: source.id, p_destination_account_id: byId("schedule-destination").value || null, p_category_id: byId("schedule-category").value || null, p_investment_target: cashbookAccount(byId("schedule-destination").value)?.asset_class || null, p_note: byId("schedule-note").value.trim() || null, p_due_on: scheduleType === "one_time" ? byId("schedule-date").value || null : null, p_monthly_day: scheduleType === "monthly_day" ? Number(byId("schedule-month-day").value) : null, p_monthly_ordinal: scheduleType === "monthly_nth_weekday" ? Number(byId("schedule-nth").value) : null, p_monthly_weekday: scheduleType === "monthly_nth_weekday" ? Number(byId("schedule-weekday").value) : null, p_auto_post: byId("schedule-auto-post").checked, p_status: "active" });
+    await cashbookRpc("cashbook_schedule_save", { p_id: editing?.id || null, p_title: byId("schedule-name").value.trim(), p_schedule_type: scheduleType, p_event_type: eventType, p_amount: num(byId("schedule-amount").value), p_currency: source.currency, p_source_account_id: source.id, p_destination_account_id: byId("schedule-destination").value || null, p_category_id: byId("schedule-category").value || null, p_investment_target: destination?.asset_class || null, p_note: byId("schedule-note").value.trim() || null, p_due_on: scheduleType === "one_time" ? byId("schedule-date").value || null : null, p_monthly_day: scheduleType === "monthly_day" ? Number(byId("schedule-month-day").value) : null, p_monthly_ordinal: scheduleType === "monthly_nth_weekday" ? Number(byId("schedule-nth").value) : null, p_monthly_weekday: scheduleType === "monthly_nth_weekday" ? Number(byId("schedule-weekday").value) : null, p_auto_post: byId("schedule-auto-post").checked, p_status: "active" });
     closeSheet("cashbook-schedule-sheet"); showToast(editing ? "預定款項已更新" : "預定款項已儲存"); await loadCashbook();
   } catch (error) { status.textContent = error instanceof Error ? `儲存失敗：${error.message}` : "儲存失敗"; }
 }
