@@ -361,7 +361,7 @@
         <label><span>金額</span><input id="schedule-amount" type="number" min="0" step="0.01" inputmode="decimal" required></label>
         <label><span>扣款／轉出帳戶</span><select id="schedule-source" required></select></label>
         <label id="schedule-destination-field"><span>轉入帳戶</span><select id="schedule-destination"></select></label>
-        <label id="schedule-category-field"><span>支出品類</span><select id="schedule-category"></select></label>
+        <label id="schedule-category-field"><span id="schedule-category-label">支出品類</span><select id="schedule-category"></select></label>
         <label><span>時間方式</span><select id="schedule-type"><option value="one_time">單次指定日期</option><option value="monthly_day">每月固定日期</option><option value="monthly_nth_weekday">每月第幾個週幾</option><option value="undated">尚未確定日期</option></select></label>
         <label id="schedule-date-field"><span>日期</span><input id="schedule-date" type="date"></label>
         <label id="schedule-month-day-field" hidden><span>每月日期</span><input id="schedule-month-day" type="number" min="1" max="31" inputmode="numeric"></label>

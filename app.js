@@ -1364,9 +1364,13 @@ function refreshScheduleFields() {
   byId("schedule-weekday-field").hidden = type !== "monthly_nth_weekday";
   byId("schedule-destination-field").hidden = eventType === "expense";
   byId("schedule-category-field").hidden = !["expense", "investment_funding_transfer"].includes(eventType);
+  byId("schedule-category-label").textContent = eventType === "investment_funding_transfer" ? "資產投入品類" : "支出品類";
   const categoryValue = byId("schedule-category").value;
   const allowedCategories = state.cashbook.categories.filter((category) => category.status === "active" && (eventType === "expense" ? category.category_type === "expense" : eventType === "investment_funding_transfer" ? category.category_type === "balance" && category.name === "資產投入" : false));
-  if (["expense", "investment_funding_transfer"].includes(eventType)) { byId("schedule-category").innerHTML = `<option value="">請選擇</option>${allowedCategories.map((category) => `<option value="${category.id}">${escapeHtml(category.name)}</option>`).join("")}`; byId("schedule-category").value = categoryValue; }
+  if (["expense", "investment_funding_transfer"].includes(eventType)) {
+    byId("schedule-category").innerHTML = `<option value="">請選擇</option>${allowedCategories.map((category) => `<option value="${category.id}">${escapeHtml(category.name)}</option>`).join("")}`;
+    byId("schedule-category").value = allowedCategories.some((category) => category.id === categoryValue) ? categoryValue : (eventType === "investment_funding_transfer" ? allowedCategories[0]?.id || "" : "");
+  }
   if (type === "undated") { byId("schedule-auto-post").checked = false; byId("schedule-auto-post").disabled = true; } else byId("schedule-auto-post").disabled = false;
 }
 
@@ -1398,6 +1402,7 @@ async function saveSchedule(event) {
   const status = byId("cashbook-schedule-status");
   if (!source || !(num(byId("schedule-amount").value) > 0)) { status.textContent = "請選擇帳戶並輸入確定金額"; return; }
   if (eventType === "transfer" && destination?.account_type === "asset_cost") { status.textContent = "交屋／裝潢等轉入房地產成本帳戶，請選「資產投入」；實際付款時才會認列成本。"; return; }
+  if (eventType === "investment_funding_transfer" && !byId("schedule-category").value) { status.textContent = "找不到「資產投入」品類，請先在日常帳本新增該品類。"; return; }
   status.textContent = "儲存中…";
   try {
     const scheduleType = byId("schedule-type").value;
