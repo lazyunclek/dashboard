@@ -441,8 +441,11 @@ input::placeholder { color: #53645a; }
 .cashbook-account-copy strong, .cashbook-account-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cashbook-account-copy strong { font-size: 16px; font-weight: 620; }
 .cashbook-account-copy small { margin-top: 6px; color: var(--muted); font: 12px/1 var(--mono); }
+.cashbook-account-balance-wrap { display: grid; justify-items: end; gap: 5px; min-width: 0; }
 .cashbook-account-balance { color: var(--positive); text-align: right; font: 650 16px/1.2 var(--mono); }
 .cashbook-account-row.is-negative .cashbook-account-balance { color: var(--negative); }
+.cashbook-account-projection { color: var(--muted); text-align: right; font: 10px/1.1 var(--mono); white-space: nowrap; }
+.cashbook-account-projection.is-negative { color: var(--negative); }
 .cashbook-account-row { width: 100%; border-inline: 0; text-align: left; }
 button.cashbook-account-row { cursor: pointer; }
 .cashbook-inline-action { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }

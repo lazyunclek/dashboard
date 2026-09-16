@@ -911,6 +911,19 @@ function cashbookEvent(eventId) {
   return state.cashbook.ledger.find((row) => row.id === eventId) || null;
 }
 
+function scheduledAccountProjection(accountId) {
+  let net = 0;
+  let count = 0;
+  for (const schedule of state.cashbook.schedules) {
+    if (schedule.status !== "active") continue;
+    let delta = 0;
+    if (schedule.source_account_id === accountId && ["expense", "transfer", "credit_card_payment", "investment_funding_transfer"].includes(schedule.event_type)) delta -= num(schedule.amount);
+    if (schedule.destination_account_id === accountId && ["transfer", "credit_card_payment", "investment_funding_transfer"].includes(schedule.event_type)) delta += num(schedule.amount);
+    if (delta) { net += delta; count += 1; }
+  }
+  return { net, count };
+}
+
 async function loadCashbook() {
   if (state.cashbook.loading) return;
   state.cashbook.loading = true;
@@ -986,7 +999,12 @@ function renderCashbookAccounts() {
       const accountKind = account.account_type === "asset_cost"
         ? cashbookAssetClassLabels[account.asset_class] || "資產成本"
         : cashbookAccountTypeLabels[account.account_type] || account.account_type;
-      row.innerHTML = `<span class="cashbook-account-copy"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.currency)} · ${escapeHtml(accountKind)}</small></span><b class="cashbook-account-balance private-number">${cashbookMoney(account.balance, account.currency)}</b>`;
+      const projection = scheduledAccountProjection(account.id);
+      const projectedBalance = num(account.balance) + projection.net;
+      const projectionHint = projection.count
+        ? `<small class="cashbook-account-projection ${projectedBalance < 0 ? "is-negative" : ""}">含 ${projection.count} 筆預定後：${cashbookMoney(projectedBalance, account.currency)}</small>`
+        : "";
+      row.innerHTML = `<span class="cashbook-account-copy"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.currency)} · ${escapeHtml(accountKind)}</small></span><span class="cashbook-account-balance-wrap"><b class="cashbook-account-balance private-number">${cashbookMoney(account.balance, account.currency)}</b>${projectionHint}</span>`;
       section.append(row);
     }
     strip.append(section);
