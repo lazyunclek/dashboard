@@ -868,7 +868,27 @@ const cashbookAccountTypeLabels = {
   asset_cost: "資產成本"
 };
 const cashbookAssetClassLabels = { crypto: "虛擬貨幣", tw_equity: "台股", us_equity: "美股", real_estate: "房地產" };
+const propertyCostKindLabels = {
+  principal: "可回收本金",
+  interest: "利息",
+  management_fee: "管理費",
+  furniture: "家具",
+  other_non_recoverable: "其他費用／不保證回收",
+  unclassified: "待分類"
+};
 const usdEquivalentCurrencies = new Set(["USD", "USDC", "USDT"]);
+
+function propertyCostKindForPayload(payload = {}) {
+  if (propertyCostKindLabels[payload.property_cost_kind]) return payload.property_cost_kind;
+  if (payload.property_cost_recovery === "recoverable") return "principal";
+  if (payload.property_cost_recovery === "non_recoverable") return "other_non_recoverable";
+  return "unclassified";
+}
+
+function propertyRecoveryForKind(kind) {
+  if (kind === "principal") return "recoverable";
+  return ["interest", "management_fee", "furniture", "other_non_recoverable"].includes(kind) ? "non_recoverable" : null;
+}
 
 function cashbookEntryTone(eventType) {
   if (eventType === "expense") return "is-expense";
@@ -1032,7 +1052,8 @@ function renderCashbookSchedules() {
     item.dataset.cashbookScheduleId = schedule.id;
     item.className = `cashbook-account-row cashbook-schedule-row ${schedule.next_due_on && schedule.next_due_on < today ? "is-overdue" : ""}`;
     const flow = schedule.event_type === "expense" ? source?.name || "未指定帳戶" : `${source?.name || "未指定帳戶"} → ${destination?.name || "未指定帳戶"}`;
-    item.innerHTML = `<span class="cashbook-account-copy"><strong>${escapeHtml(schedule.title)}</strong><small class="schedule-date">${escapeHtml(scheduleLabel(schedule))} · ${schedule.auto_post ? "到期自動入帳" : "待你確認"}</small><small>${escapeHtml(flow)}${schedule.note ? ` · ${escapeHtml(schedule.note)}` : ""}</small></span><b class="cashbook-account-balance private-number">${cashbookMoney(schedule.amount, schedule.currency)}</b>`;
+    const propertyKind = schedule.event_type === "investment_funding_transfer" && schedule.investment_target === "real_estate" ? propertyCostKindLabels[schedule.property_cost_kind] || "待分類" : "";
+    item.innerHTML = `<span class="cashbook-account-copy"><strong>${escapeHtml(schedule.title)}</strong><small class="schedule-date">${escapeHtml(scheduleLabel(schedule))} · ${schedule.auto_post ? "到期自動入帳" : "待你確認"}</small><small>${escapeHtml(flow)}${propertyKind ? ` · ${escapeHtml(propertyKind)}` : ""}${schedule.note ? ` · ${escapeHtml(schedule.note)}` : ""}</small></span><b class="cashbook-account-balance private-number">${cashbookMoney(schedule.amount, schedule.currency)}</b>`;
     list.append(item);
   }
 }
@@ -1308,7 +1329,8 @@ function refreshCashbookForm({ rebuildOptions = false } = {}) {
     note = "依原始交易金額與帳戶實際入扣金額推導。";
   } else if (isFunding && source && destination && amount > 0) {
     title = `資產成本增加 ${cashbookMoney(amount, source.currency)}`;
-    note = isProperty ? byId("cashbook-property-recovery").value === "recoverable" ? "列為賣房時可回收本金。" : byId("cashbook-property-recovery").value === "non_recoverable" ? "列為費用／不保證回收成本。" : "請選擇房地產成本回收屬性。" : "不列入生活收入或支出。";
+    const propertyKind = byId("cashbook-property-recovery").value;
+    note = isProperty ? propertyKind === "principal" ? "列為賣房時可回收本金。" : propertyKind === "unclassified" ? "先列入房地產成本，回收性待你日後分類。" : `列為${propertyCostKindLabels[propertyKind] || "費用／不保證回收"}，不計入可回收本金。` : "不列入生活收入或支出。";
   } else if (isRecovery && source && destination && amount > 0) {
     title = `資產回收 ${cashbookMoney(amount, source.currency)}`;
     note = `${cashbookAssetClassLabels[source.asset_class] || "資產"}淨投入減少、${destination.name} 增加；請填寫已扣除投資費用與稅額的實際淨收款。`;
@@ -1340,7 +1362,7 @@ function openCashbookForm(existing = null, occurredOn = state.cashbook.selectedD
   byId("cashbook-has-fee").checked = num(existing?.fee_amount) > 0;
   byId("cashbook-fee-amount").value = existing?.fee_amount || 0;
   byId("cashbook-note").value = existing?.note || "";
-  byId("cashbook-property-recovery").value = existing?.source_payload?.property_cost_recovery || "";
+  byId("cashbook-property-recovery").value = propertyCostKindForPayload(existing?.source_payload);
   byId("cashbook-form-status").textContent = "";
   byId("cashbook-void-button").hidden = !existing;
   refreshCashbookForm({ rebuildOptions: true });
@@ -1376,12 +1398,15 @@ function scheduleOptions(selected = {}) {
 function refreshScheduleFields() {
   const type = byId("schedule-type").value;
   const eventType = byId("schedule-event-type").value;
+  const destination = cashbookAccount(byId("schedule-destination").value);
+  const isPropertyFunding = eventType === "investment_funding_transfer" && destination?.asset_class === "real_estate";
   byId("schedule-date-field").hidden = type !== "one_time";
   byId("schedule-month-day-field").hidden = type !== "monthly_day";
   byId("schedule-nth-field").hidden = type !== "monthly_nth_weekday";
   byId("schedule-weekday-field").hidden = type !== "monthly_nth_weekday";
   byId("schedule-destination-field").hidden = eventType === "expense";
   byId("schedule-category-field").hidden = !["expense", "investment_funding_transfer"].includes(eventType);
+  byId("schedule-property-kind-field").hidden = !isPropertyFunding;
   byId("schedule-category-label").textContent = eventType === "investment_funding_transfer" ? "資產投入品類" : "支出品類";
   const categoryValue = byId("schedule-category").value;
   const allowedCategories = state.cashbook.categories.filter((category) => category.status === "active" && (eventType === "expense" ? category.category_type === "expense" : eventType === "investment_funding_transfer" ? category.category_type === "balance" && category.name === "資產投入" : false));
@@ -1389,6 +1414,7 @@ function refreshScheduleFields() {
     byId("schedule-category").innerHTML = `<option value="">請選擇</option>${allowedCategories.map((category) => `<option value="${category.id}">${escapeHtml(category.name)}</option>`).join("")}`;
     byId("schedule-category").value = allowedCategories.some((category) => category.id === categoryValue) ? categoryValue : (eventType === "investment_funding_transfer" ? allowedCategories[0]?.id || "" : "");
   }
+  if (!propertyCostKindLabels[byId("schedule-property-cost-kind").value]) byId("schedule-property-cost-kind").value = "unclassified";
   if (type === "undated") { byId("schedule-auto-post").checked = false; byId("schedule-auto-post").disabled = true; } else byId("schedule-auto-post").disabled = false;
 }
 
@@ -1405,6 +1431,7 @@ function openScheduleSheet(schedule = null) {
   byId("schedule-nth").value = schedule?.monthly_ordinal || 1;
   byId("schedule-weekday").value = schedule?.monthly_weekday || 1;
   byId("schedule-auto-post").checked = schedule?.auto_post ?? true;
+  byId("schedule-property-cost-kind").value = schedule?.property_cost_kind || "unclassified";
   byId("schedule-note").value = schedule?.note || "";
   byId("cashbook-schedule-cancel").hidden = !schedule;
   byId("cashbook-schedule-status").textContent = "";
@@ -1417,14 +1444,16 @@ async function saveSchedule(event) {
   const source = cashbookAccount(byId("schedule-source").value);
   const destination = cashbookAccount(byId("schedule-destination").value);
   const eventType = byId("schedule-event-type").value;
+  const propertyKind = byId("schedule-property-cost-kind").value;
   const status = byId("cashbook-schedule-status");
   if (!source || !(num(byId("schedule-amount").value) > 0)) { status.textContent = "請選擇帳戶並輸入確定金額"; return; }
   if (eventType === "transfer" && destination?.account_type === "asset_cost") { status.textContent = "交屋／裝潢等轉入房地產成本帳戶，請選「資產投入」；實際付款時才會認列成本。"; return; }
   if (eventType === "investment_funding_transfer" && !byId("schedule-category").value) { status.textContent = "找不到「資產投入」品類，請先在日常帳本新增該品類。"; return; }
+  if (eventType === "investment_funding_transfer" && destination?.asset_class === "real_estate" && !propertyCostKindLabels[propertyKind]) { status.textContent = "請選擇房地產成本分類"; return; }
   status.textContent = "儲存中…";
   try {
     const scheduleType = byId("schedule-type").value;
-    await cashbookRpc("cashbook_schedule_save", { p_id: editing?.id || null, p_title: byId("schedule-name").value.trim(), p_schedule_type: scheduleType, p_event_type: eventType, p_amount: num(byId("schedule-amount").value), p_currency: source.currency, p_source_account_id: source.id, p_destination_account_id: byId("schedule-destination").value || null, p_category_id: byId("schedule-category").value || null, p_investment_target: destination?.asset_class || null, p_note: byId("schedule-note").value.trim() || null, p_due_on: scheduleType === "one_time" ? byId("schedule-date").value || null : null, p_monthly_day: scheduleType === "monthly_day" ? Number(byId("schedule-month-day").value) : null, p_monthly_ordinal: scheduleType === "monthly_nth_weekday" ? Number(byId("schedule-nth").value) : null, p_monthly_weekday: scheduleType === "monthly_nth_weekday" ? Number(byId("schedule-weekday").value) : null, p_auto_post: byId("schedule-auto-post").checked, p_status: "active" });
+    await cashbookRpc("cashbook_schedule_save", { p_id: editing?.id || null, p_title: byId("schedule-name").value.trim(), p_schedule_type: scheduleType, p_event_type: eventType, p_amount: num(byId("schedule-amount").value), p_currency: source.currency, p_source_account_id: source.id, p_destination_account_id: byId("schedule-destination").value || null, p_category_id: byId("schedule-category").value || null, p_investment_target: destination?.asset_class || null, p_property_cost_kind: eventType === "investment_funding_transfer" && destination?.asset_class === "real_estate" ? propertyKind : null, p_note: byId("schedule-note").value.trim() || null, p_due_on: scheduleType === "one_time" ? byId("schedule-date").value || null : null, p_monthly_day: scheduleType === "monthly_day" ? Number(byId("schedule-month-day").value) : null, p_monthly_ordinal: scheduleType === "monthly_nth_weekday" ? Number(byId("schedule-nth").value) : null, p_monthly_weekday: scheduleType === "monthly_nth_weekday" ? Number(byId("schedule-weekday").value) : null, p_auto_post: byId("schedule-auto-post").checked, p_status: "active" });
     closeSheet("cashbook-schedule-sheet"); showToast(editing ? "預定款項已更新" : "預定款項已儲存"); await loadCashbook();
   } catch (error) { status.textContent = error instanceof Error ? `儲存失敗：${error.message}` : "儲存失敗"; }
 }
@@ -1470,7 +1499,8 @@ async function saveCashbookEvent(event) {
   const propertyRelated = mode === "investment_funding_transfer"
     ? destination?.asset_class === "real_estate"
     : Boolean(existing?.source_payload?.property_related);
-  const recovery = byId("cashbook-property-recovery").value;
+  const propertyKind = byId("cashbook-property-recovery").value;
+  const recovery = propertyRecoveryForKind(propertyKind);
   const status = byId("cashbook-form-status");
   if (!(amount > 0)) return void (status.textContent = "請輸入大於 0 的金額");
   if (mode === "expense" && (!source || !byId("cashbook-category").value || !(sourceAmount > 0))) return void (status.textContent = "請選擇付款帳戶、支出品類並完成金額");
@@ -1481,7 +1511,7 @@ async function saveCashbookEvent(event) {
   if (mode === "opening_balance" && !destination) return void (status.textContent = "請選擇初始化帳戶");
   if ((mode === "expense" || mode === "income") && originalCurrency !== accountCurrency && !(settled > 0)) return void (status.textContent = `請輸入帳戶實際${mode === "expense" ? "扣款" : "入帳"}金額`);
   if (crossCurrency && !(received > 0)) return void (status.textContent = "請輸入轉入帳戶實收金額");
-  if (propertyRelated && mode !== "income" && !recovery) return void (status.textContent = "請選擇房地產成本回收屬性");
+  if (propertyRelated && mode !== "income" && !propertyCostKindLabels[propertyKind]) return void (status.textContent = "請選擇房地產成本分類");
   const pooledCostFx = num(state.data?.pooledCostFx);
   if (mode === "opening_balance" && usdEquivalentCurrencies.has(destination.currency) && destination.account_type !== "credit_card" && !(pooledCostFx > 0)) return void (status.textContent = `投資資料尚無美元成本，暫時無法初始化 ${destination.currency}`);
   let rate = null;
@@ -1529,6 +1559,7 @@ async function saveCashbookEvent(event) {
         ui: "investment_mobile",
         asset_recovery_basis: mode === "investment_recovery_transfer" ? "net_sale_proceeds" : null,
         property_related: propertyRelated,
+        property_cost_kind: propertyRelated && mode !== "income" ? propertyKind : null,
         property_cost_recovery: propertyRelated && mode !== "income" ? recovery : null
       },
       p_idempotency_key: existing?.idempotency_key || `mobile:${crypto.randomUUID()}`
@@ -1934,6 +1965,7 @@ byId("cashbook-schedule-sheet").addEventListener("click", (event) => { if (event
 byId("cashbook-schedule-form").addEventListener("submit", saveSchedule);
 byId("schedule-type").addEventListener("change", refreshScheduleFields);
 byId("schedule-event-type").addEventListener("change", refreshScheduleFields);
+byId("schedule-destination").addEventListener("change", refreshScheduleFields);
 byId("cashbook-schedule-cancel").addEventListener("click", async () => { const schedule = state.cashbook.editingSchedule; if (!schedule || !window.confirm("取消這筆預定款項？已發生帳目不會受影響。")) return; try { await cashbookRpc("cashbook_schedule_cancel", { p_id: schedule.id }); closeSheet("cashbook-schedule-sheet"); showToast("預定款項已取消"); await loadCashbook(); } catch (error) { byId("cashbook-schedule-status").textContent = error instanceof Error ? error.message : "取消失敗"; } });
 byId("cashbook-add-account").addEventListener("click", () => openAccountSheet());
 byId("cashbook-account-close").addEventListener("click", () => closeSheet("cashbook-account-sheet"));
