@@ -1060,7 +1060,8 @@ function renderPropertyCostDetails(account, rows, legacyRows = []) {
   });
   const legacyDetailRows = legacyRows.filter((row) => ["recoverable", "non_recoverable"].includes(row.recovery_class)).map((row) => {
     const label = row.recovery_class === "recoverable" ? "可回收本金" : "費用／不保證回收";
-    return `<article class="property-cost-detail-row"><span><strong>${escapeHtml(row.label || "房地產歷史分類")}</strong><small>${escapeHtml(row.event_date || "歷史資料")} · ${label} · 歷史分類來源</small></span><b class="property-cost-detail-amount private-number">${cashbookMoney(row.amount_twd, account.currency)}</b></article>`;
+    const costKind = propertyCostKindLabels[row.cost_kind] || label;
+    return `<article class="property-cost-detail-row"><span><strong>${escapeHtml(row.label || "房地產歷史分類")}</strong><small>${escapeHtml(row.event_date || "歷史資料")} · ${escapeHtml(costKind)} · 歷史分類來源</small></span><b class="property-cost-detail-amount private-number">${cashbookMoney(row.amount_twd, account.currency)}</b></article>`;
   });
   list.innerHTML = [...eventRows, ...legacyDetailRows].join("");
 }
@@ -1075,7 +1076,7 @@ async function openPropertyCostDetails(accountId) {
   try {
     const select = "select=id,occurred_on,event_type,original_amount,original_currency,account_currency,destination_amount,twd_value,merchant,note,source_payload,status";
     const legacyPropertyEvents = state.data?.portfolio?.id
-      ? fetchAll(`investment_property_events?select=event_date,label,amount_twd,recovery_class&portfolio_id=eq.${encodeURIComponent(state.data.portfolio.id)}&recovery_class=in.(recoverable,non_recoverable)&order=event_date.desc`)
+      ? fetchAll(`investment_property_events?select=event_date,label,amount_twd,recovery_class,cost_kind&portfolio_id=eq.${encodeURIComponent(state.data.portfolio.id)}&recovery_class=in.(recoverable,non_recoverable)&order=event_date.desc`)
       : Promise.resolve([]);
     const [fundingRows, propertyExpenseRows, legacyRows] = await Promise.all([
       fetchAll(`cashbook_events?${select}&status=eq.posted&destination_account_id=eq.${encodeURIComponent(account.id)}&order=occurred_on.desc,created_at.desc`),
