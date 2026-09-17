@@ -1012,10 +1012,10 @@ function renderCashbookAccounts() {
       : `${rows.length} 個帳戶`;
     section.innerHTML = `<div class="cashbook-account-group-title"><span>${escapeHtml(title)}</span><strong class="private-number">${escapeHtml(summary)}</strong></div>`;
     for (const account of rows) {
-      const row = document.createElement("button");
-      row.type = "button";
-      row.className = `cashbook-account-row ${num(account.balance) < 0 ? "is-negative" : ""}`;
-      row.dataset.cashbookAccountId = account.id;
+      const isPropertyAccount = account.account_type === "asset_cost" && account.asset_class === "real_estate";
+      const row = document.createElement(isPropertyAccount ? "div" : "button");
+      if (!isPropertyAccount) { row.type = "button"; row.dataset.cashbookAccountId = account.id; }
+      row.className = `cashbook-account-row ${isPropertyAccount ? "is-property-account" : ""} ${num(account.balance) < 0 ? "is-negative" : ""}`;
       const accountKind = account.account_type === "asset_cost"
         ? cashbookAssetClassLabels[account.asset_class] || "資產成本"
         : cashbookAccountTypeLabels[account.account_type] || account.account_type;
@@ -1024,10 +1024,46 @@ function renderCashbookAccounts() {
       const projectionHint = projection.count
         ? `<small class="cashbook-account-projection ${projectedBalance < 0 ? "is-negative" : ""}">含 ${projection.count} 筆預定後：${cashbookMoney(projectedBalance, account.currency)}</small>`
         : "";
-      row.innerHTML = `<span class="cashbook-account-copy"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.currency)} · ${escapeHtml(accountKind)}</small></span><span class="cashbook-account-balance-wrap"><b class="cashbook-account-balance private-number">${cashbookMoney(account.balance, account.currency)}</b>${projectionHint}</span>`;
+      row.innerHTML = `<span class="cashbook-account-copy"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.currency)} · ${escapeHtml(accountKind)}</small></span>${isPropertyAccount ? `<button class="property-details-button" type="button" data-property-cost-details-account-id="${account.id}">查看細節</button>` : ""}<span class="cashbook-account-balance-wrap"><b class="cashbook-account-balance private-number">${cashbookMoney(account.balance, account.currency)}</b>${projectionHint}</span>`;
       section.append(row);
     }
     strip.append(section);
+  }
+}
+
+function propertyCostEventAmount(row) {
+  return num(row.destination_amount ?? row.original_amount);
+}
+
+function renderPropertyCostDetails(account, rows) {
+  const totals = Object.fromEntries(Object.keys(propertyCostKindLabels).map((kind) => [kind, 0]));
+  for (const row of rows) totals[propertyCostKindForPayload(row.source_payload)] += propertyCostEventAmount(row);
+  byId("property-cost-details-summary").innerHTML = Object.entries(propertyCostKindLabels)
+    .map(([kind, label]) => `<div><span>${escapeHtml(label)}</span><strong class="private-number">${cashbookMoney(totals[kind], account.currency)}</strong></div>`)
+    .join("");
+  const list = byId("property-cost-details-list");
+  if (!rows.length) { list.innerHTML = '<div class="empty-state">這個帳戶還沒有已入帳的房地產成本。</div>'; return; }
+  list.innerHTML = rows.map((row) => {
+    const kind = propertyCostKindForPayload(row.source_payload);
+    const title = row.merchant || row.note || cashbookTypeLabels[row.event_type] || "房地產成本";
+    return `<article class="property-cost-detail-row"><span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(row.occurred_on)} · ${escapeHtml(propertyCostKindLabels[kind])}</small></span><b class="property-cost-detail-amount private-number">${cashbookMoney(propertyCostEventAmount(row), account.currency)}</b></article>`;
+  }).join("");
+}
+
+async function openPropertyCostDetails(accountId) {
+  const account = cashbookAccount(accountId);
+  if (!account || account.account_type !== "asset_cost" || account.asset_class !== "real_estate") return;
+  byId("property-cost-details-title").textContent = `${account.name}細節`;
+  byId("property-cost-details-summary").innerHTML = '<div><span>讀取中</span><strong>—</strong></div>';
+  byId("property-cost-details-list").innerHTML = '<div class="empty-state">正在讀取已入帳成本…</div>';
+  openSheet("property-cost-details-sheet");
+  try {
+    const select = "select=id,occurred_on,event_type,original_amount,original_currency,account_currency,destination_amount,merchant,note,source_payload,status";
+    const rows = await fetchAll(`cashbook_events?${select}&status=eq.posted&destination_account_id=eq.${encodeURIComponent(account.id)}&order=occurred_on.desc,created_at.desc`);
+    renderPropertyCostDetails(account, rows);
+  } catch (error) {
+    byId("property-cost-details-summary").innerHTML = "";
+    byId("property-cost-details-list").innerHTML = `<div class="empty-state">${escapeHtml(error instanceof Error ? error.message : "讀取失敗")}</div>`;
   }
 }
 
@@ -1381,7 +1417,7 @@ function closeCashbookForm() {
 }
 
 function openSheet(id) { byId(id).hidden = false; document.body.classList.add("sheet-open"); }
-function closeSheet(id) { byId(id).hidden = true; if (byId("cashbook-sheet").hidden && byId("cashbook-schedule-sheet").hidden && byId("cashbook-account-sheet").hidden) document.body.classList.remove("sheet-open"); }
+function closeSheet(id) { byId(id).hidden = true; if (byId("cashbook-sheet").hidden && byId("cashbook-schedule-sheet").hidden && byId("cashbook-account-sheet").hidden && byId("property-cost-details-sheet").hidden) document.body.classList.remove("sheet-open"); }
 
 function scheduleOptions(selected = {}) {
   const normal = state.cashbook.accounts.filter((a) => a.status === "active" && !["asset_cost", "investment_bridge"].includes(a.account_type));
@@ -1937,6 +1973,8 @@ document.addEventListener("click", (event) => {
   }
   const scheduleRow = event.target.closest("[data-cashbook-schedule-id]");
   if (scheduleRow) { openScheduleSheet(state.cashbook.schedules.find((row) => row.id === scheduleRow.dataset.cashbookScheduleId) || null); return; }
+  const propertyDetailsButton = event.target.closest("[data-property-cost-details-account-id]");
+  if (propertyDetailsButton) { void openPropertyCostDetails(propertyDetailsButton.dataset.propertyCostDetailsAccountId); return; }
   const accountRow = event.target.closest("[data-cashbook-account-id]");
   if (accountRow) { openAccountSheet(cashbookAccount(accountRow.dataset.cashbookAccountId)); return; }
   const button = event.target.closest("[data-asset-ledger]");
@@ -1970,6 +2008,8 @@ byId("cashbook-schedule-cancel").addEventListener("click", async () => { const s
 byId("cashbook-add-account").addEventListener("click", () => openAccountSheet());
 byId("cashbook-account-close").addEventListener("click", () => closeSheet("cashbook-account-sheet"));
 byId("cashbook-account-sheet").addEventListener("click", (event) => { if (event.target === byId("cashbook-account-sheet")) closeSheet("cashbook-account-sheet"); });
+byId("property-cost-details-close").addEventListener("click", () => closeSheet("property-cost-details-sheet"));
+byId("property-cost-details-sheet").addEventListener("click", (event) => { if (event.target === byId("property-cost-details-sheet")) closeSheet("property-cost-details-sheet"); });
 byId("cashbook-account-form").addEventListener("submit", saveAccount);
 byId("cashbook-close-button").addEventListener("click", closeCashbookForm);
 byId("cashbook-sheet").addEventListener("click", (event) => { if (event.target === byId("cashbook-sheet")) closeCashbookForm(); });

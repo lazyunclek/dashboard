@@ -448,6 +448,18 @@ input::placeholder { color: #53645a; }
 .cashbook-account-projection.is-negative { color: var(--negative); }
 .cashbook-account-row { width: 100%; border-inline: 0; text-align: left; }
 button.cashbook-account-row { cursor: pointer; }
+.cashbook-account-row.is-property-account { grid-template-columns: minmax(0, 1fr) auto auto; }
+.property-details-button { min-height: 30px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 9px; color: var(--accent); background: transparent; font-size: 10px; font-weight: 750; white-space: nowrap; cursor: pointer; }
+.property-cost-details { display: grid; gap: 14px; padding: 16px; }
+.property-cost-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--line); }
+.property-cost-summary > div { min-width: 0; padding: 11px; background: var(--panel-soft); }
+.property-cost-summary span, .property-cost-summary small { display: block; color: var(--muted); font-size: 10px; }
+.property-cost-summary strong { display: block; margin-top: 5px; color: var(--text); font: 700 13px/1.2 var(--mono); }
+.property-cost-detail-list { display: grid; border-top: 1px solid var(--line); }
+.property-cost-detail-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.property-cost-detail-row strong, .property-cost-detail-row small { display: block; }
+.property-cost-detail-row small { margin-top: 4px; color: var(--muted); font-size: 10px; }
+.property-cost-detail-amount { align-self: center; color: var(--text); text-align: right; font: 650 12px/1.2 var(--mono); white-space: nowrap; }
 .cashbook-inline-action { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .cashbook-inline-action small { color: var(--muted); font-size: 10px; text-align: right; }
 .cashbook-schedule-row .cashbook-account-balance { color: var(--warning); }
