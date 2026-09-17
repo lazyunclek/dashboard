@@ -772,11 +772,15 @@ function supportsDollarDisplay(position) {
 }
 
 function capitalRecoveryStatus(history) {
-  if (!history || history.status === "empty") return "";
-  if (history.status === "currency_mismatch") return "回本歷程：結算幣別待核對";
-  if (history.activeCycle) return `第 ${history.activeCycle.number} 輪回本中 · 尚待回收 ${money(history.activeCycle.outstandingAmount, history.settlementCurrency || "TWD")}`;
-  if (history.zeroCostCount) return `已完成第 ${history.zeroCostCount} 次零成本 · 目前維持零成本`;
-  return "已清倉 · 未建立零成本持倉";
+  if (!history || history.status === "empty") return null;
+  if (history.status === "currency_mismatch") return { label: "回本紀錄", title: "結算幣別待核對", detail: "" };
+  if (history.activeCycle) return {
+    label: "回本進度",
+    title: `第 ${history.activeCycle.number} 輪`,
+    detail: `尚待 ${money(history.activeCycle.outstandingAmount, history.settlementCurrency || "TWD")}`
+  };
+  if (history.zeroCostCount) return { label: "回本紀錄", title: `已回本 ${history.zeroCostCount} 次`, detail: "目前零成本" };
+  return { label: "回本紀錄", title: "已清倉", detail: "未保留零成本持倉" };
 }
 
 function positionCard(position) {
@@ -851,7 +855,7 @@ function positionCard(position) {
       <span class="position-detail"><span>主題</span><strong>${escapeHtml(position.subTheme)}</strong></span>
       <span class="position-detail"><span>行情時間</span><strong>${dateTime(position.marketPriceAt)}</strong></span>
     </div>
-    ${recoveryStatus ? `<p class="capital-recovery-status private-number">${escapeHtml(recoveryStatus)}</p>` : ""}
+    ${recoveryStatus ? `<div class="capital-recovery-status"><span>${escapeHtml(recoveryStatus.label)}</span><strong>${escapeHtml(recoveryStatus.title)}</strong>${recoveryStatus.detail ? `<b class="private-number">${escapeHtml(recoveryStatus.detail)}</b>` : ""}</div>` : ""}
     <div class="position-ledger-actions" aria-label="${escapeHtml(position.displaySymbol)} 成交紀錄篩選">
       ${recoveryAction}${ledgerActions}
     </div>`;

@@ -466,7 +466,10 @@ button.cashbook-account-row { cursor: pointer; }
 .property-cost-scheduled { margin-top: 16px; padding-top: 2px; border-top: 1px solid var(--line-strong); }
 .property-cost-scheduled > p { margin: 0 0 2px; color: var(--muted); font-size: 10px; }
 .property-cost-detail-row.is-scheduled .property-cost-detail-amount { color: var(--warning); }
-.capital-recovery-status { margin: 2px 0 0; color: var(--accent); font: 650 10px/1.45 var(--mono); }
+.capital-recovery-status { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 9px; align-items: baseline; padding: 10px 14px; border-top: 1px solid var(--line); background: rgba(136, 255, 86, 0.025); }
+.capital-recovery-status span { color: var(--muted); font: 650 9px/1 var(--mono); letter-spacing: 0.08em; }
+.capital-recovery-status strong { color: var(--text); font-size: 12px; }
+.capital-recovery-status b { color: var(--accent); font: 650 11px/1 var(--mono); white-space: nowrap; }
 .capital-recovery-details { display: grid; gap: 16px; padding: 16px; }
 .capital-recovery-current { display: grid; gap: 5px; padding: 14px; border: 1px solid rgba(136, 255, 86, 0.32); border-radius: 13px; background: rgba(136, 255, 86, 0.06); }
 .capital-recovery-current > span, .capital-recovery-current small { color: var(--muted); font-size: 10px; line-height: 1.55; }
