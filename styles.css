@@ -453,8 +453,10 @@ button.cashbook-account-row { cursor: pointer; }
 .property-cost-details { display: grid; gap: 14px; padding: 16px; }
 .property-cost-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--line); }
 .property-cost-summary > div { min-width: 0; padding: 11px; background: var(--panel-soft); }
+.property-cost-summary > .property-cost-total { grid-column: 1 / -1; padding: 14px 11px; }
 .property-cost-summary span, .property-cost-summary small { display: block; color: var(--muted); font-size: 10px; }
 .property-cost-summary strong { display: block; margin-top: 5px; color: var(--text); font: 700 13px/1.2 var(--mono); }
+.property-cost-summary .property-cost-total strong { font-size: 22px; }
 .property-cost-detail-list { display: grid; border-top: 1px solid var(--line); }
 .property-cost-detail-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .property-cost-detail-row strong, .property-cost-detail-row small { display: block; }

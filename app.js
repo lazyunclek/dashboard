@@ -1032,15 +1032,18 @@ function renderCashbookAccounts() {
 }
 
 function propertyCostEventAmount(row) {
+  if (row.event_type === "expense") return num(row.twd_value ?? (row.original_currency === "TWD" ? row.original_amount : 0));
   return num(row.destination_amount ?? row.original_amount);
 }
 
 function renderPropertyCostDetails(account, rows) {
   const totals = Object.fromEntries(Object.keys(propertyCostKindLabels).map((kind) => [kind, 0]));
   for (const row of rows) totals[propertyCostKindForPayload(row.source_payload)] += propertyCostEventAmount(row);
-  byId("property-cost-details-summary").innerHTML = Object.entries(propertyCostKindLabels)
-    .map(([kind, label]) => `<div><span>${escapeHtml(label)}</span><strong class="private-number">${cashbookMoney(totals[kind], account.currency)}</strong></div>`)
-    .join("");
+  const recoverable = totals.principal;
+  const nonRecoverable = totals.interest + totals.management_fee + totals.furniture + totals.other_non_recoverable;
+  const unclassified = totals.unclassified;
+  const total = recoverable + nonRecoverable + unclassified;
+  byId("property-cost-details-summary").innerHTML = `<div class="property-cost-total"><span>日常房地產累計支出</span><strong class="private-number">${cashbookMoney(total, account.currency)}</strong><small>只計已入帳款項</small></div><div><span>可回收本金</span><strong class="private-number">${cashbookMoney(recoverable, account.currency)}</strong></div><div><span>費用／不保證回收</span><strong class="private-number">${cashbookMoney(nonRecoverable, account.currency)}</strong></div><div><span>待分類</span><strong class="private-number">${cashbookMoney(unclassified, account.currency)}</strong></div>`;
   const list = byId("property-cost-details-list");
   if (!rows.length) { list.innerHTML = '<div class="empty-state">這個帳戶還沒有已入帳的房地產成本。</div>'; return; }
   list.innerHTML = rows.map((row) => {
@@ -1058,8 +1061,13 @@ async function openPropertyCostDetails(accountId) {
   byId("property-cost-details-list").innerHTML = '<div class="empty-state">正在讀取已入帳成本…</div>';
   openSheet("property-cost-details-sheet");
   try {
-    const select = "select=id,occurred_on,event_type,original_amount,original_currency,account_currency,destination_amount,merchant,note,source_payload,status";
-    const rows = await fetchAll(`cashbook_events?${select}&status=eq.posted&destination_account_id=eq.${encodeURIComponent(account.id)}&order=occurred_on.desc,created_at.desc`);
+    const select = "select=id,occurred_on,event_type,original_amount,original_currency,account_currency,destination_amount,twd_value,merchant,note,source_payload,status";
+    const [fundingRows, propertyExpenseRows] = await Promise.all([
+      fetchAll(`cashbook_events?${select}&status=eq.posted&destination_account_id=eq.${encodeURIComponent(account.id)}&order=occurred_on.desc,created_at.desc`),
+      fetchAll(`cashbook_events?${select}&status=eq.posted&event_type=eq.expense&source_payload-%3E%3Eproperty_related=eq.true&order=occurred_on.desc,created_at.desc`)
+    ]);
+    const rows = [...new Map([...fundingRows, ...propertyExpenseRows].map((row) => [row.id, row])).values()]
+      .sort((left, right) => String(right.occurred_on).localeCompare(String(left.occurred_on)));
     renderPropertyCostDetails(account, rows);
   } catch (error) {
     byId("property-cost-details-summary").innerHTML = "";
