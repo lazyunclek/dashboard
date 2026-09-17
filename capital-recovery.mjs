@@ -29,7 +29,7 @@ export function buildCapitalRecoveryHistory(rows, { quantityScale = 8, tolerance
     .filter(Boolean))];
   const quantityTolerance = Math.max(tolerance, 10 ** -Math.min(10, Math.max(0, numeric(quantityScale))));
   if (currencies.length > 1) {
-    return { status: "currency_mismatch", settlementCurrency: null, cycles: [], activeCycle: null, zeroCostCount: 0 };
+    return { status: "currency_mismatch", settlementCurrency: null, cycles: [], activeCycle: null, zeroCostCount: 0, currentRoundCost: null, realizedAmount: null };
   }
 
   let quantity = 0;
@@ -87,7 +87,12 @@ export function buildCapitalRecoveryHistory(rows, { quantityScale = 8, tolerance
     if (row.transaction_type === "sell") {
       quantity -= rowQuantity;
       if (!current) {
-        if (latestZeroCostCycle) latestZeroCostCycle.remainingQuantity = Math.max(0, quantity);
+        if (latestZeroCostCycle) {
+          latestZeroCostCycle.soldQuantity += rowQuantity;
+          latestZeroCostCycle.recoveredAmount += receivedAmount(row);
+          latestZeroCostCycle.excessRecoveryAmount = Math.max(0, latestZeroCostCycle.recoveredAmount - latestZeroCostCycle.investedAmount);
+          latestZeroCostCycle.remainingQuantity = Math.max(0, quantity);
+        }
         continue;
       }
       current.soldQuantity += rowQuantity;
@@ -114,11 +119,16 @@ export function buildCapitalRecoveryHistory(rows, { quantityScale = 8, tolerance
     cycles.push(current);
   }
   const activeCycle = cycles.findLast((cycle) => cycle.status === "recovering") || null;
+  const realizedAmount = cycles
+    .filter((cycle) => cycle.status !== "recovering")
+    .reduce((sum, cycle) => sum + cycle.recoveredAmount - cycle.investedAmount, 0);
   return {
     status: ordered.length ? "ready" : "empty",
     settlementCurrency: currencies[0] || null,
     cycles,
     activeCycle,
-    zeroCostCount: cycles.filter((cycle) => cycle.status === "zero_cost").length
+    zeroCostCount: cycles.filter((cycle) => cycle.status === "zero_cost").length,
+    currentRoundCost: activeCycle ? activeCycle.outstandingAmount : 0,
+    realizedAmount
   };
 }

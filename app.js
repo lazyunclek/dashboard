@@ -421,6 +421,7 @@ function buildDashboard(raw) {
     if (!asset) continue;
     const ledger = movingLedger(rows);
     const capitalRecovery = buildCapitalRecoveryHistory(rows, { quantityScale: asset.quantity_scale });
+    const usesRecoveryRounds = capitalRecovery.status === "ready";
     const lastRow = [...rows].sort((a, b) => String(b.trade_date).localeCompare(String(a.trade_date)) || String(b.created_at).localeCompare(String(a.created_at)))[0];
     const tradeCurrency = rows.find((row) => ["buy", "sell"].includes(row.transaction_type))?.settlement_currency || asset.quote_currency;
     const price = latestPrices.get(asset.id) || latestPrices.get(String(asset.symbol).toUpperCase());
@@ -429,8 +430,10 @@ function buildDashboard(raw) {
     const costFx = tradeCurrency === "TWD" ? 1 : pooledCostFx;
     const marketValueNative = nativePrice === null ? null : ledger.quantity * nativePrice;
     const marketValueTwd = marketValueNative === null ? null : marketValueNative * marketFx;
-    const costTwd = ledger.remainingCost * costFx;
-    const realizedPnlTwd = ledger.realizedPnl * costFx;
+    const costNative = usesRecoveryRounds ? capitalRecovery.currentRoundCost : ledger.remainingCost;
+    const costTwd = costNative * costFx;
+    const realizedPnlNative = usesRecoveryRounds ? capitalRecovery.realizedAmount : ledger.realizedPnl;
+    const realizedPnlTwd = realizedPnlNative * costFx;
     const incomeTwd = num(incomeByAsset.get(asset.id));
     positions.push({
       id: asset.id,
@@ -446,13 +449,16 @@ function buildDashboard(raw) {
       priceScale: asset.price_scale,
       quantity: ledger.quantity,
       soldQuantity: ledger.soldQuantity,
-      costNative: ledger.remainingCost,
+      costNative,
       costTwd,
+      lifetimeNetCapitalNative: ledger.remainingCost,
+      lifetimeNetCapitalTwd: ledger.remainingCost * costFx,
+      lifetimeNetCapitalUsd: toUsd(ledger.remainingCost * costFx),
       boughtCostTwd: ledger.boughtCost * costFx,
       soldProceedsTwd: ledger.soldProceeds * costFx,
       boughtCostNative: ledger.boughtCost,
       soldProceedsNative: ledger.soldProceeds,
-      averageCost: ledger.quantity > 0 ? ledger.remainingCost / ledger.quantity : null,
+      averageCost: ledger.quantity > 0 ? costNative / ledger.quantity : null,
       buyAveragePrice: ledger.buyAveragePrice,
       sellAveragePrice: ledger.sellAveragePrice,
       marketPrice: nativePrice,
@@ -465,12 +471,12 @@ function buildDashboard(raw) {
       marketValueUsd: toUsd(marketValueTwd),
       unrealizedPnlTwd: marketValueTwd === null ? null : marketValueTwd - costTwd,
       unrealizedPnlUsd: marketValueTwd === null ? null : toUsd(marketValueTwd - costTwd),
-      unrealizedPnlNative: marketValueNative === null ? null : marketValueNative - ledger.remainingCost,
-      fxPnlTwd: tradeCurrency === "TWD" ? 0 : ledger.remainingCost * (currentFx - pooledCostFx),
+      unrealizedPnlNative: marketValueNative === null ? null : marketValueNative - costNative,
+      fxPnlTwd: tradeCurrency === "TWD" ? 0 : costNative * (currentFx - pooledCostFx),
       unrealizedPnlPct: marketValueTwd === null || costTwd <= 0 ? null : (marketValueTwd - costTwd) / costTwd * 100,
       realizedPnlTwd,
       realizedPnlUsd: toUsd(realizedPnlTwd),
-      realizedPnlNative: ledger.realizedPnl,
+      realizedPnlNative,
       incomeTwd,
       incomeUsd: toUsd(incomeTwd),
       incomeNative: num(incomeNativeByAsset.get(asset.id)),
@@ -482,6 +488,7 @@ function buildDashboard(raw) {
       lastTransactionDate: lastRow?.trade_date || null,
       lastTransactionType: lastRow?.transaction_type || null,
       capitalRecovery,
+      usesRecoveryRounds,
       primarySector: asset.metadata?.primary_sector || "其他／待分類",
       subTheme: asset.metadata?.sub_theme || "未分類",
       isClosed: Math.abs(ledger.quantity) < 1e-10,
@@ -812,6 +819,13 @@ function positionCard(position) {
     : displayAmount(position.marketValueTwd, position.marketValueNative, position.marketValueUsd);
   const summaryValueLabel = isClosed ? "累計賣出實收" : "目前市值";
   const openAverageCost = perSharePrice(position.averageCost, position.quoteCurrency, position.assetClass);
+  const openAverageCostLabel = position.usesRecoveryRounds ? "回本成本均價" : "持倉均價";
+  const openCostLabel = position.usesRecoveryRounds ? "本輪成本" : "剩餘成本";
+  const lifetimeNetCapital = displayAmount(position.lifetimeNetCapitalTwd, position.lifetimeNetCapitalNative, position.lifetimeNetCapitalUsd);
+  const openCost = displayAmount(position.costTwd, position.costNative, position.costUsd);
+  const lifetimeNetCapitalNote = !isClosed && position.usesRecoveryRounds && Math.abs(num(position.lifetimeNetCapitalNative) - num(position.costNative)) > 0.005
+    ? `<small class="position-detail-note private-number">歷來淨投入 ${money(lifetimeNetCapital, displayCurrency)}</small>`
+    : "";
   const ledgerTransactions = state.data.transactions.filter((row) => row.asset_id === position.id && row.details?.event_role !== "asset_fee");
   const buyCount = ledgerTransactions.filter((row) => row.transaction_type === "buy").length;
   const sellCount = ledgerTransactions.filter((row) => row.transaction_type === "sell").length;
@@ -843,10 +857,10 @@ function positionCard(position) {
     </summary>
     <div class="position-details">
       <span class="position-detail"><span>${isClosed ? "已清倉數量" : "持有數量"}</span><strong class="private-number">${quantity(isClosed ? position.soldQuantity : position.quantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</strong></span>
-      <span class="position-detail"><span>${isClosed ? "當初購買均價" : "持倉均價"}</span><strong class="private-number">${isClosed ? perSharePrice(position.buyAveragePrice, position.quoteCurrency, position.assetClass) : openAverageCost}</strong></span>
+      <span class="position-detail"><span>${isClosed ? "當初購買均價" : openAverageCostLabel}</span><strong class="private-number">${isClosed ? perSharePrice(position.buyAveragePrice, position.quoteCurrency, position.assetClass) : openAverageCost}</strong></span>
       <span class="position-detail"><span>${isClosed ? "出清均價" : "最新價格"}</span><strong class="private-number">${perSharePrice(isClosed ? position.sellAveragePrice : position.marketPrice, isClosed ? position.quoteCurrency : position.marketPriceCurrency, position.assetClass)}${!isClosed && position.marketPriceStatus === "stale" ? '<small class="price-status is-stale">行情過期</small>' : ""}</strong></span>
       <span class="position-detail"><span>累計買入均價</span><strong class="private-number">${perSharePrice(position.buyAveragePrice, position.quoteCurrency, position.assetClass)}</strong></span>
-      <span class="position-detail"><span>${isClosed ? "累計買入實付" : "剩餘成本"}</span><strong class="private-number">${money(displayAmount(isClosed ? position.boughtCostTwd : position.costTwd, isClosed ? position.boughtCostNative : position.costNative, isClosed ? position.boughtCostUsd : position.costUsd), displayCurrency)}</strong></span>
+      <span class="position-detail"><span>${isClosed ? "累計買入實付" : openCostLabel}</span><strong class="private-number">${money(isClosed ? displayAmount(position.boughtCostTwd, position.boughtCostNative, position.boughtCostUsd) : openCost, displayCurrency)}</strong>${lifetimeNetCapitalNote}</span>
       <span class="position-detail"><span>累計賣出均價</span><strong class="private-number">${perSharePrice(position.sellAveragePrice, position.quoteCurrency, position.assetClass)}</strong></span>
       <span class="position-detail"><span>${isClosed ? "累計賣出實收" : "未實現損益"}</span><strong class="private-number ${isClosed ? realizedTone : pnlTone}">${isClosed ? money(displayAmount(position.soldProceedsTwd, position.soldProceedsNative, position.soldProceedsUsd), displayCurrency) : usesNativeUsd ? money(nativePnl, displayCurrency, true) : usesUsd ? money(position.unrealizedPnlUsd, displayCurrency, true) : hasPnl ? money(pnl, "TWD", true) : "—"}</strong></span>
       <span class="position-detail"><span>${isClosed ? "清倉日期" : "未實現報酬"}</span><strong class="private-number ${pnlTone}">${isClosed ? dateTime(position.lastTransactionDate) : position.unrealizedPnlPct === null ? "零成本／待補" : pnlPercent}</strong></span>
@@ -912,7 +926,7 @@ function renderCapitalRecoveryDetails(position) {
       <p>回收賣出 <b class="private-number">${quantity(cycle.soldQuantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</b> · 實收 <b class="private-number">${money(cycle.recoveredAmount, currency)}</b></p>
       ${isZeroCost ? `<p>達標賣出 <b class="private-number">${quantity(cycle.triggerSellQuantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</b> · 實收 <b class="private-number">${money(cycle.triggerSellAmount, currency)}</b></p><p>達標當時保留 <b class="private-number">${quantity(cycle.retainedAtZeroCost, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</b>${cycle.remainingQuantity !== cycle.retainedAtZeroCost ? ` · 目前剩餘 <b class="private-number">${quantity(cycle.remainingQuantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</b>` : ""}</p>` : ""}
     </article>`;
-  }).join("")}<p class="capital-recovery-note">僅以買入實付與賣出實收推導；股息、轉帳與手續費不計入回收金額。原有成本與損益數字不受影響。</p>`;
+  }).join("")}<p class="capital-recovery-note">僅以買入實付與賣出實收推導；股息、轉帳與手續費不計入回收金額。持倉卡會把輪次成本、歷來淨投入與損益分開呈現，不改寫原始交易。</p>`;
 }
 
 function openCapitalRecoveryDetails(assetId) {

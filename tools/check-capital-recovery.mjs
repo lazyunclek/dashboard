@@ -42,6 +42,21 @@ const row = (id, type, quantity, amount, date, extra = {}) => ({
   ]);
   assert.equal(history.zeroCostCount, 1);
   assert.equal(history.cycles[0].remainingQuantity, 2, "Transfers change shares retained but not recovered cash");
+  assert.equal(history.cycles[0].excessRecoveryAmount, 20, "Later zero-cost sales add to that completed round's realized gain");
+}
+
+{
+  const history = buildCapitalRecoveryHistory([
+    row("1", "buy", 4, 4443, "2026-07-06"),
+    row("2", "buy", 10, 10759, "2026-07-06"),
+    row("3", "buy", 5, 5354, "2026-07-06"),
+    row("4", "sell", 19, 24890, "2026-07-13"),
+    row("5", "buy", 3, 3181, "2026-09-04"),
+    row("6", "buy", 3, 3121, "2026-09-14")
+  ]);
+  assert.equal(history.cycles.length, 2, "A completed round followed by a new buy creates a second round");
+  assert.equal(history.realizedAmount, 4334, "First-round gain remains realized");
+  assert.equal(history.currentRoundCost, 6302, "Second-round cost is not reduced by first-round profit");
 }
 
 {

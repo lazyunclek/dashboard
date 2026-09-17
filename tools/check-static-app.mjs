@@ -28,6 +28,9 @@ for (const token of ["pnlPercent", "unrealizedPnlPct.toFixed(2)"]) {
 for (const behavior of ["positionExpandedIds", "details.open = state.positionExpandedIds.has(position.id)", "details.addEventListener(\"toggle\""]) {
   if (!app.includes(behavior)) throw new Error(`Missing expanded-position state preservation: ${behavior}`);
 }
+for (const behavior of ["currentRoundCost", "realizedAmount", "本輪成本", "歷來淨投入", "回本成本均價"]) {
+  if (!app.includes(behavior)) throw new Error(`Missing round-based position accounting behavior: ${behavior}`);
+}
 for (const behavior of ["buildCapitalRecoveryHistory", "capital-recovery-sheet", "openCapitalRecoveryDetails", "data-capital-recovery-asset-id", "本金回收歷程"]) {
   if (!app.includes(behavior) && !html.includes(behavior)) throw new Error(`Missing capital recovery behavior: ${behavior}`);
 }
