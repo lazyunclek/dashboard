@@ -1036,21 +1036,33 @@ function propertyCostEventAmount(row) {
   return num(row.destination_amount ?? row.original_amount);
 }
 
-function renderPropertyCostDetails(account, rows) {
+function renderPropertyCostDetails(account, rows, legacyRows = []) {
   const totals = Object.fromEntries(Object.keys(propertyCostKindLabels).map((kind) => [kind, 0]));
   for (const row of rows) totals[propertyCostKindForPayload(row.source_payload)] += propertyCostEventAmount(row);
-  const recoverable = totals.principal;
-  const nonRecoverable = totals.interest + totals.management_fee + totals.furniture + totals.other_non_recoverable;
-  const unclassified = totals.unclassified;
-  const total = recoverable + nonRecoverable + unclassified;
+  const total = Object.values(totals).reduce((sum, amount) => sum + amount, 0);
+  let recoverable = totals.principal;
+  let nonRecoverable = totals.interest + totals.management_fee + totals.furniture + totals.other_non_recoverable;
+  let classificationRoom = Math.max(total - recoverable - nonRecoverable, 0);
+  for (const row of legacyRows.filter((row) => ["recoverable", "non_recoverable"].includes(row.recovery_class))) {
+    const amount = Math.min(num(row.amount_twd), classificationRoom);
+    if (row.recovery_class === "recoverable") recoverable += amount;
+    else nonRecoverable += amount;
+    classificationRoom -= amount;
+  }
+  const unclassified = classificationRoom;
   byId("property-cost-details-summary").innerHTML = `<div class="property-cost-total"><span>日常房地產累計支出</span><strong class="private-number">${cashbookMoney(total, account.currency)}</strong><small>只計已入帳款項</small></div><div><span>可回收本金</span><strong class="private-number">${cashbookMoney(recoverable, account.currency)}</strong></div><div><span>費用／不保證回收</span><strong class="private-number">${cashbookMoney(nonRecoverable, account.currency)}</strong></div><div><span>待分類</span><strong class="private-number">${cashbookMoney(unclassified, account.currency)}</strong></div>`;
   const list = byId("property-cost-details-list");
-  if (!rows.length) { list.innerHTML = '<div class="empty-state">這個帳戶還沒有已入帳的房地產成本。</div>'; return; }
-  list.innerHTML = rows.map((row) => {
+  if (!rows.length && !legacyRows.length) { list.innerHTML = '<div class="empty-state">這個帳戶還沒有已入帳的房地產成本。</div>'; return; }
+  const eventRows = rows.map((row) => {
     const kind = propertyCostKindForPayload(row.source_payload);
     const title = row.merchant || row.note || cashbookTypeLabels[row.event_type] || "房地產成本";
     return `<article class="property-cost-detail-row"><span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(row.occurred_on)} · ${escapeHtml(propertyCostKindLabels[kind])}</small></span><b class="property-cost-detail-amount private-number">${cashbookMoney(propertyCostEventAmount(row), account.currency)}</b></article>`;
-  }).join("");
+  });
+  const legacyDetailRows = legacyRows.filter((row) => ["recoverable", "non_recoverable"].includes(row.recovery_class)).map((row) => {
+    const label = row.recovery_class === "recoverable" ? "可回收本金" : "費用／不保證回收";
+    return `<article class="property-cost-detail-row"><span><strong>${escapeHtml(row.label || "房地產歷史分類")}</strong><small>${escapeHtml(row.event_date || "歷史資料")} · ${label} · 歷史分類來源</small></span><b class="property-cost-detail-amount private-number">${cashbookMoney(row.amount_twd, account.currency)}</b></article>`;
+  });
+  list.innerHTML = [...eventRows, ...legacyDetailRows].join("");
 }
 
 async function openPropertyCostDetails(accountId) {
@@ -1062,13 +1074,17 @@ async function openPropertyCostDetails(accountId) {
   openSheet("property-cost-details-sheet");
   try {
     const select = "select=id,occurred_on,event_type,original_amount,original_currency,account_currency,destination_amount,twd_value,merchant,note,source_payload,status";
-    const [fundingRows, propertyExpenseRows] = await Promise.all([
+    const legacyPropertyEvents = state.data?.portfolio?.id
+      ? fetchAll(`investment_property_events?select=event_date,label,amount_twd,recovery_class&portfolio_id=eq.${encodeURIComponent(state.data.portfolio.id)}&recovery_class=in.(recoverable,non_recoverable)&order=event_date.desc`)
+      : Promise.resolve([]);
+    const [fundingRows, propertyExpenseRows, legacyRows] = await Promise.all([
       fetchAll(`cashbook_events?${select}&status=eq.posted&destination_account_id=eq.${encodeURIComponent(account.id)}&order=occurred_on.desc,created_at.desc`),
-      fetchAll(`cashbook_events?${select}&status=eq.posted&event_type=eq.expense&source_payload-%3E%3Eproperty_related=eq.true&order=occurred_on.desc,created_at.desc`)
+      fetchAll(`cashbook_events?${select}&status=eq.posted&event_type=eq.expense&source_payload-%3E%3Eproperty_related=eq.true&order=occurred_on.desc,created_at.desc`),
+      legacyPropertyEvents
     ]);
     const rows = [...new Map([...fundingRows, ...propertyExpenseRows].map((row) => [row.id, row])).values()]
       .sort((left, right) => String(right.occurred_on).localeCompare(String(left.occurred_on)));
-    renderPropertyCostDetails(account, rows);
+    renderPropertyCostDetails(account, rows, legacyRows);
   } catch (error) {
     byId("property-cost-details-summary").innerHTML = "";
     byId("property-cost-details-list").innerHTML = `<div class="empty-state">${escapeHtml(error instanceof Error ? error.message : "讀取失敗")}</div>`;
