@@ -481,7 +481,8 @@ button.cashbook-account-row { cursor: pointer; }
 .capital-recovery-cycle header span { display: grid; gap: 4px; }
 .capital-recovery-cycle header strong { font-size: 13px; }
 .capital-recovery-cycle header small, .capital-recovery-cycle p, .capital-recovery-note { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
-.capital-recovery-cycle header > b { color: var(--text); font: 650 11px/1.35 var(--mono); text-align: right; white-space: nowrap; }
+.capital-recovery-cycle header > b { display: grid; gap: 3px; color: var(--text); font: 650 11px/1.35 var(--mono); text-align: right; white-space: nowrap; }
+.capital-recovery-cycle header > b small { color: var(--muted); font: 600 8px/1 var(--mono); }
 .capital-recovery-cycle.is-zero-cost header > b { color: var(--accent); }
 .capital-recovery-cycle p b { color: var(--text); font-family: var(--mono); font-weight: 650; }
 .capital-recovery-note { padding-top: 14px; }

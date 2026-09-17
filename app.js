@@ -899,9 +899,15 @@ function renderCapitalRecoveryDetails(position) {
   timeline.innerHTML = `${history.cycles.map((cycle) => {
     const isZeroCost = cycle.status === "zero_cost";
     const isActive = cycle.status === "recovering";
-    const ending = isActive ? `尚待 ${money(cycle.outstandingAmount, currency)}` : isZeroCost ? `保留 ${quantity(cycle.remainingQuantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}` : cycle.status === "closed_after_recovery" ? "本金已回收" : `尚差 ${money(cycle.outstandingAmount, currency)}`;
+    const ending = isActive
+      ? { label: "尚待回收", value: money(cycle.outstandingAmount, currency) }
+      : isZeroCost
+        ? { label: "回本時已實現", value: money(cycle.excessRecoveryAmount, currency, true) }
+        : cycle.status === "closed_after_recovery"
+          ? { label: "已實現交易損益", value: money(cycle.excessRecoveryAmount, currency, true) }
+          : { label: "尚待回收", value: money(cycle.outstandingAmount, currency) };
     return `<article class="capital-recovery-cycle ${isActive ? "is-active" : ""} ${isZeroCost ? "is-zero-cost" : ""}">
-      <header><span><strong>${escapeHtml(recoveryCycleLabel(cycle))}</strong><small>${escapeHtml(shortDate(cycle.startedOn))}${cycle.completedOn ? ` → ${escapeHtml(shortDate(cycle.completedOn))}` : ""}</small></span><b class="private-number">${ending}</b></header>
+      <header><span><strong>${escapeHtml(recoveryCycleLabel(cycle))}</strong><small>${escapeHtml(shortDate(cycle.startedOn))}${cycle.completedOn ? ` → ${escapeHtml(shortDate(cycle.completedOn))}` : ""}</small></span><b class="private-number"><small>${escapeHtml(ending.label)}</small>${ending.value}</b></header>
       <p>本輪加倉 <b class="private-number">${quantity(cycle.buyQuantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</b> · 實付 <b class="private-number">${money(cycle.investedAmount, currency)}</b></p>
       <p>回收賣出 <b class="private-number">${quantity(cycle.soldQuantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</b> · 實收 <b class="private-number">${money(cycle.recoveredAmount, currency)}</b></p>
       ${isZeroCost ? `<p>達標賣出 <b class="private-number">${quantity(cycle.triggerSellQuantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</b> · 實收 <b class="private-number">${money(cycle.triggerSellAmount, currency)}</b></p><p>達標當時保留 <b class="private-number">${quantity(cycle.retainedAtZeroCost, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</b>${cycle.remainingQuantity !== cycle.retainedAtZeroCost ? ` · 目前剩餘 <b class="private-number">${quantity(cycle.remainingQuantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</b>` : ""}</p>` : ""}
