@@ -1036,7 +1036,7 @@ function propertyCostEventAmount(row) {
   return num(row.destination_amount ?? row.original_amount);
 }
 
-function renderPropertyCostDetails(account, rows, legacyRows = []) {
+function renderPropertyCostDetails(account, rows, legacyRows = [], scheduledRows = []) {
   const totals = Object.fromEntries(Object.keys(propertyCostKindLabels).map((kind) => [kind, 0]));
   for (const row of rows) totals[propertyCostKindForPayload(row.source_payload)] += propertyCostEventAmount(row);
   const total = Object.values(totals).reduce((sum, amount) => sum + amount, 0);
@@ -1052,7 +1052,7 @@ function renderPropertyCostDetails(account, rows, legacyRows = []) {
   const unclassified = classificationRoom;
   byId("property-cost-details-summary").innerHTML = `<div class="property-cost-total"><span>日常房地產累計支出</span><strong class="private-number">${cashbookMoney(total, account.currency)}</strong><small>只計已入帳款項</small></div><div><span>可回收本金</span><strong class="private-number">${cashbookMoney(recoverable, account.currency)}</strong></div><div><span>費用／不保證回收</span><strong class="private-number">${cashbookMoney(nonRecoverable, account.currency)}</strong></div><div><span>待分類</span><strong class="private-number">${cashbookMoney(unclassified, account.currency)}</strong></div>`;
   const list = byId("property-cost-details-list");
-  if (!rows.length && !legacyRows.length) { list.innerHTML = '<div class="empty-state">這個帳戶還沒有已入帳的房地產成本。</div>'; return; }
+  if (!rows.length && !legacyRows.length && !scheduledRows.length) { list.innerHTML = '<div class="empty-state">這個帳戶還沒有已入帳或預定的房地產款項。</div>'; return; }
   const eventRows = rows.map((row) => {
     const kind = propertyCostKindForPayload(row.source_payload);
     const title = row.merchant || row.note || cashbookTypeLabels[row.event_type] || "房地產成本";
@@ -1063,7 +1063,13 @@ function renderPropertyCostDetails(account, rows, legacyRows = []) {
     const costKind = propertyCostKindLabels[row.cost_kind] || label;
     return `<article class="property-cost-detail-row"><span><strong>${escapeHtml(row.label || "房地產歷史分類")}</strong><small>${escapeHtml(row.event_date || "歷史資料")} · ${escapeHtml(costKind)} · 歷史分類來源</small></span><b class="property-cost-detail-amount private-number">${cashbookMoney(row.amount_twd, account.currency)}</b></article>`;
   });
-  list.innerHTML = [...eventRows, ...legacyDetailRows].join("");
+  const scheduledDetailRows = scheduledRows.map((row) => {
+    const source = cashbookAccount(row.source_account_id);
+    const kind = propertyCostKindLabels[row.property_cost_kind] || "待分類";
+    return `<article class="property-cost-detail-row is-scheduled"><span><strong>${escapeHtml(row.title || "預定房地產款項")}</strong><small>${escapeHtml(scheduleLabel(row))} · ${escapeHtml(kind)} · 預定，尚未入帳</small><small>${escapeHtml(source?.name || "未指定扣款帳戶")}${row.note ? ` · ${escapeHtml(row.note)}` : ""}</small></span><b class="property-cost-detail-amount private-number">${cashbookMoney(row.amount, row.currency || account.currency)}</b></article>`;
+  });
+  const postedRows = [...eventRows, ...legacyDetailRows];
+  list.innerHTML = `${postedRows.length ? `<h3 class="property-cost-detail-heading">已入帳款項</h3>${postedRows.join("")}` : '<div class="empty-state">這個帳戶還沒有已入帳的房地產成本。</div>'}${scheduledDetailRows.length ? `<section class="property-cost-scheduled"><h3 class="property-cost-detail-heading">預定款項</h3><p>僅供預抓，不納入上方累計與分類總額。</p>${scheduledDetailRows.join("")}</section>` : ""}`;
 }
 
 async function openPropertyCostDetails(accountId) {
@@ -1071,7 +1077,7 @@ async function openPropertyCostDetails(accountId) {
   if (!account || account.account_type !== "asset_cost" || account.asset_class !== "real_estate") return;
   byId("property-cost-details-title").textContent = `${account.name}細節`;
   byId("property-cost-details-summary").innerHTML = '<div><span>讀取中</span><strong>—</strong></div>';
-  byId("property-cost-details-list").innerHTML = '<div class="empty-state">正在讀取已入帳成本…</div>';
+  byId("property-cost-details-list").innerHTML = '<div class="empty-state">正在讀取房地產明細…</div>';
   openSheet("property-cost-details-sheet");
   try {
     const select = "select=id,occurred_on,event_type,original_amount,original_currency,account_currency,destination_amount,twd_value,merchant,note,source_payload,status";
@@ -1085,7 +1091,8 @@ async function openPropertyCostDetails(accountId) {
     ]);
     const rows = [...new Map([...fundingRows, ...propertyExpenseRows].map((row) => [row.id, row])).values()]
       .sort((left, right) => String(right.occurred_on).localeCompare(String(left.occurred_on)));
-    renderPropertyCostDetails(account, rows, legacyRows);
+    const scheduledRows = state.cashbook.schedules.filter((row) => row.status === "active" && row.event_type === "investment_funding_transfer" && row.destination_account_id === account.id);
+    renderPropertyCostDetails(account, rows, legacyRows, scheduledRows);
   } catch (error) {
     byId("property-cost-details-summary").innerHTML = "";
     byId("property-cost-details-list").innerHTML = `<div class="empty-state">${escapeHtml(error instanceof Error ? error.message : "讀取失敗")}</div>`;
