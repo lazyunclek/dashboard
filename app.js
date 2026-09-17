@@ -1516,8 +1516,23 @@ function closeCashbookForm() {
   state.cashbook.editingEvent = null;
 }
 
-function openSheet(id) { byId(id).hidden = false; document.body.classList.add("sheet-open"); }
-function closeSheet(id) { byId(id).hidden = true; if (byId("cashbook-sheet").hidden && byId("cashbook-schedule-sheet").hidden && byId("cashbook-account-sheet").hidden && byId("property-cost-details-sheet").hidden && byId("capital-recovery-sheet").hidden) document.body.classList.remove("sheet-open"); }
+function openSheet(id) {
+  if (!document.body.classList.contains("sheet-open")) {
+    state.sheetScrollY = window.scrollY;
+    document.body.style.top = `-${state.sheetScrollY}px`;
+  }
+  byId(id).hidden = false;
+  document.body.classList.add("sheet-open");
+}
+
+function closeSheet(id) {
+  byId(id).hidden = true;
+  const allSheetsClosed = byId("cashbook-sheet").hidden && byId("cashbook-schedule-sheet").hidden && byId("cashbook-account-sheet").hidden && byId("property-cost-details-sheet").hidden && byId("capital-recovery-sheet").hidden;
+  if (!allSheetsClosed) return;
+  document.body.classList.remove("sheet-open");
+  document.body.style.top = "";
+  window.scrollTo({ top: state.sheetScrollY, behavior: "auto" });
+}
 
 function scheduleOptions(selected = {}) {
   const normal = state.cashbook.accounts.filter((a) => a.status === "active" && !["asset_cost", "investment_bridge"].includes(a.account_type));
