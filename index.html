@@ -325,9 +325,9 @@
           <label id="cashbook-category-field"><span>品類</span><select id="cashbook-category"></select></label>
           <label id="cashbook-recovery-field" hidden><span>房地產成本分類</span><select id="cashbook-property-recovery">
             <option value="principal">可回收本金</option>
-            <option value="interest">利息</option>
-            <option value="management_fee">管理費</option>
-            <option value="furniture">家具</option>
+            <option value="interest">利息／不保證回收</option>
+            <option value="management_fee">管理費／不保證回收</option>
+            <option value="furniture">家具／不保證回收</option>
             <option value="other_non_recoverable">其他費用／不保證回收</option>
             <option value="unclassified">待分類</option>
           </select></label>
@@ -365,7 +365,7 @@
         <label><span>扣款／轉出帳戶</span><select id="schedule-source" required></select></label>
         <label id="schedule-destination-field"><span>轉入帳戶</span><select id="schedule-destination"></select></label>
         <label id="schedule-category-field"><span id="schedule-category-label">支出品類</span><select id="schedule-category"></select></label>
-        <label id="schedule-property-kind-field" hidden><span>房地產成本分類</span><select id="schedule-property-cost-kind"><option value="principal">可回收本金</option><option value="interest">利息</option><option value="management_fee">管理費</option><option value="furniture">家具</option><option value="other_non_recoverable">其他費用／不保證回收</option><option value="unclassified">待分類</option></select></label>
+        <label id="schedule-property-kind-field" hidden><span>房地產成本分類</span><select id="schedule-property-cost-kind"><option value="principal">可回收本金</option><option value="interest">利息／不保證回收</option><option value="management_fee">管理費／不保證回收</option><option value="furniture">家具／不保證回收</option><option value="other_non_recoverable">其他費用／不保證回收</option><option value="unclassified">待分類</option></select></label>
         <label><span>時間方式</span><select id="schedule-type"><option value="one_time">單次指定日期</option><option value="monthly_day">每月固定日期</option><option value="monthly_nth_weekday">每月第幾個週幾</option><option value="undated">尚未確定日期</option></select></label>
         <label id="schedule-date-field"><span>日期</span><input id="schedule-date" type="date"></label>
         <label id="schedule-month-day-field" hidden><span>每月日期</span><input id="schedule-month-day" type="number" min="1" max="31" inputmode="numeric"></label>

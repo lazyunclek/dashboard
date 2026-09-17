@@ -870,9 +870,9 @@ const cashbookAccountTypeLabels = {
 const cashbookAssetClassLabels = { crypto: "虛擬貨幣", tw_equity: "台股", us_equity: "美股", real_estate: "房地產" };
 const propertyCostKindLabels = {
   principal: "可回收本金",
-  interest: "利息",
-  management_fee: "管理費",
-  furniture: "家具",
+  interest: "利息／不保證回收",
+  management_fee: "管理費／不保證回收",
+  furniture: "家具／不保證回收",
   other_non_recoverable: "其他費用／不保證回收",
   unclassified: "待分類"
 };
