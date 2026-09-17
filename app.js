@@ -1,5 +1,3 @@
-import { buildCapitalRecoveryHistory } from "./capital-recovery.mjs";
-
 const config = window.__INVESTMENT_DASHBOARD_CONFIG__;
 
 if (!config || !config.supabaseUrl || !config.supabasePublishableKey || config.supabaseUrl.startsWith("__")) {
@@ -144,6 +142,26 @@ async function cashbookRpc(name, body = {}, retried = false) {
   if (response.status === 401 && !retried && await refreshSession()) return cashbookRpc(name, body, true);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.message || payload.hint || `帳目操作失敗（${response.status}）`);
+  return payload;
+}
+
+async function investmentReadRpc(name, body = {}, retried = false) {
+  if (name !== "investment_capital_recovery_summary") throw new Error("不允許的投資資料讀取");
+  if (!state.accessToken) throw new Error("請先登入");
+  const response = await fetch(`${config.supabaseUrl}/rest/v1/rpc/${name}`, {
+    method: "POST",
+    headers: {
+      apikey: config.supabasePublishableKey,
+      Authorization: `Bearer ${state.accessToken}`,
+      "Content-Type": "application/json",
+      Accept: "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+  if (response.status === 401 && !retried && await refreshSession()) return investmentReadRpc(name, body, true);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.message || payload.hint || `投資資料讀取失敗（${response.status}）`);
+  if (!Array.isArray(payload)) throw new Error("投資資料回傳格式不正確");
   return payload;
 }
 
@@ -374,6 +392,21 @@ function weightedTradePrice(rows, transactionType) {
   return totalQuantity > 0 ? totalGross / totalQuantity : null;
 }
 
+function capitalRecoveryHistoryFromSummary(summary) {
+  if (!summary) return null;
+  const cycles = Array.isArray(summary.cycles) ? summary.cycles : [];
+  const activeCycle = cycles.findLast((cycle) => cycle?.status === "recovering") || null;
+  return {
+    status: summary.status || "empty",
+    settlementCurrency: summary.settlement_currency || null,
+    cycles,
+    activeCycle,
+    zeroCostCount: num(summary.zero_cost_count),
+    currentRoundCost: summary.current_round_cost === null || summary.current_round_cost === undefined ? null : num(summary.current_round_cost),
+    realizedAmount: summary.realized_amount === null || summary.realized_amount === undefined ? null : num(summary.realized_amount)
+  };
+}
+
 function buildDashboard(raw) {
   const portfolio = raw.portfolios[0];
   if (!portfolio) throw new Error("這個帳號沒有可用的投資組合");
@@ -414,13 +447,15 @@ function buildDashboard(raw) {
     if (!rowsByAsset.has(row.asset_id)) rowsByAsset.set(row.asset_id, []);
     rowsByAsset.get(row.asset_id).push(row);
   }
+  const capitalRecoveryByAsset = new Map((raw.capitalRecoveryRows || []).map((row) => [row.asset_id, capitalRecoveryHistoryFromSummary(row)]));
 
   const positions = [];
   for (const [assetId, rows] of rowsByAsset.entries()) {
     const asset = assetsById.get(assetId);
     if (!asset) continue;
     const ledger = movingLedger(rows);
-    const capitalRecovery = buildCapitalRecoveryHistory(rows, { quantityScale: asset.quantity_scale });
+    const capitalRecovery = capitalRecoveryByAsset.get(asset.id);
+    if (!capitalRecovery) throw new Error(`缺少 ${asset.symbol || "此標的"} 的本金回收計算資料`);
     const usesRecoveryRounds = capitalRecovery.status === "ready";
     const lastRow = [...rows].sort((a, b) => String(b.trade_date).localeCompare(String(a.trade_date)) || String(b.created_at).localeCompare(String(a.created_at)))[0];
     const tradeCurrency = rows.find((row) => ["buy", "sell"].includes(row.transaction_type))?.settlement_currency || asset.quote_currency;
@@ -740,7 +775,7 @@ async function loadDashboard() {
     const portfolioId = portfolios[0]?.id;
     if (!portfolioId) throw new Error("這個帳號沒有可用的投資組合");
     const filter = `portfolio_id=eq.${encodeURIComponent(portfolioId)}`;
-    const [assets, transactions, incomeEvents, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents] = await Promise.all([
+    const [assets, transactions, incomeEvents, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents, capitalRecoveryRows] = await Promise.all([
       fetchAll(`investment_assets?select=id,portfolio_id,symbol,name,asset_class,market,quote_currency,quantity_unit,quantity_scale,price_scale,amount_scale,metadata&${filter}&order=symbol.asc`),
       fetchAll(`investment_transactions?select=id,portfolio_id,account_id,asset_id,transaction_type,trade_date,quantity,unit_price,gross_amount,fee_amount,tax_amount,net_cash_amount,settlement_currency,source_row_id,status,details,created_at,updated_at&status=neq.voided&${filter}&order=trade_date.desc,created_at.desc`),
       fetchAll(`investment_income_events?select=id,portfolio_id,account_id,asset_id,income_type,event_date,gross_amount,withholding_tax,fee_amount,net_amount,currency,status,details,created_at,updated_at&status=neq.voided&${filter}&order=event_date.desc,created_at.desc`),
@@ -748,10 +783,11 @@ async function loadDashboard() {
       fetchAll(`investment_grid_records?select=id,portfolio_id,record_state,symbol,status,investment_usdt,realized_pnl,source_updated_at&${filter}&order=source_updated_at.desc`),
       fetchAll("cashbook_account_balances?select=account_id,account_type,currency,asset_class,balance,status,use_as_investment_usd_source"),
       fetchAll("cashbook_events?select=id,event_type,original_amount,original_currency,destination_account_id,destination_amount,twd_value,source_payload,status"),
-      fetchAll(`investment_property_events?select=property_component_id,amount_twd,recovery_class&${filter}`)
+      fetchAll(`investment_property_events?select=property_component_id,amount_twd,recovery_class&${filter}`),
+      investmentReadRpc("investment_capital_recovery_summary")
     ]);
     const marketPrices = await fetchLatestMarketPrices(assets, portfolioId);
-    state.data = buildDashboard({ portfolios, assets, transactions, incomeEvents, marketPrices, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents });
+    state.data = buildDashboard({ portfolios, assets, transactions, incomeEvents, marketPrices, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents, capitalRecoveryRows });
     renderDashboard();
   } catch (error) {
     byId("error-message").textContent = error instanceof Error ? error.message : String(error);

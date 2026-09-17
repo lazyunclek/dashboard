@@ -31,7 +31,7 @@ for (const behavior of ["positionExpandedIds", "details.open = state.positionExp
 for (const behavior of ["currentRoundCost", "realizedAmount", "本輪成本", "歷來淨投入", "回本成本均價"]) {
   if (!app.includes(behavior)) throw new Error(`Missing round-based position accounting behavior: ${behavior}`);
 }
-for (const behavior of ["buildCapitalRecoveryHistory", "capital-recovery-sheet", "openCapitalRecoveryDetails", "data-capital-recovery-asset-id", "本金回收歷程"]) {
+for (const behavior of ["investment_capital_recovery_summary", "capitalRecoveryHistoryFromSummary", "capital-recovery-sheet", "openCapitalRecoveryDetails", "data-capital-recovery-asset-id", "本金回收歷程"]) {
   if (!app.includes(behavior) && !html.includes(behavior)) throw new Error(`Missing capital recovery behavior: ${behavior}`);
 }
 for (const behavior of ["function supportsDollarDisplay", 'position.assetClass === "crypto"', "marketValueUsd", "unrealizedPnlUsd", "usesNativeUsd"]) {
@@ -71,11 +71,12 @@ for (const query of ["investment_portfolios", "investment_assets", "investment_t
 if (/service[_-]?role|SUPABASE_SERVICE_ROLE|secret[_-]?key/i.test(`${app}\n${config}`)) throw new Error("Privileged Supabase credential reference found");
 if (/method:\s*["'](?:PATCH|PUT|DELETE)["']/i.test(app)) throw new Error("Investment mutation method found");
 const postCalls = [...app.matchAll(/method:\s*["']POST["']/gi)].length;
-if (postCalls !== 2 || !app.includes("/auth/v1/token") || !app.includes("/rest/v1/rpc/${name}")) throw new Error("Only Auth and the controlled cashbook RPC wrapper may use POST");
+if (postCalls !== 3 || !app.includes("/auth/v1/token") || !app.includes("/rest/v1/rpc/${name}")) throw new Error("Only Auth and the controlled RPC wrappers may use POST");
 for (const rpc of ["cashbook_ensure_defaults", "cashbook_event_save", "cashbook_event_delete", "cashbook_schedule_save", "cashbook_schedule_post", "cashbook_schedule_cancel", "cashbook_account_setup", "cashbook_account_update", "cashbook_account_reconcile"]) {
   if (!app.includes(`"${rpc}"`)) throw new Error(`Missing allowed cashbook RPC: ${rpc}`);
 }
 if (!app.includes("cashbookRpcNames.has(name)")) throw new Error("Cashbook RPC allowlist enforcement missing");
+if (!app.includes('name !== "investment_capital_recovery_summary"')) throw new Error("Investment read RPC allowlist enforcement missing");
 for (const source of ["cashbook_accounts", "cashbook_account_balances", "cashbook_categories", "cashbook_ledger", "cashbook_events", "cashbook_schedules", "cashbook_schedule_runs"]) {
   if (!app.includes(source)) throw new Error(`Missing cashbook read source: ${source}`);
 }
