@@ -1,3 +1,5 @@
+import { buildCapitalRecoveryHistory } from "./capital-recovery.mjs";
+
 const config = window.__INVESTMENT_DASHBOARD_CONFIG__;
 
 if (!config || !config.supabaseUrl || !config.supabasePublishableKey || config.supabaseUrl.startsWith("__")) {
@@ -418,6 +420,7 @@ function buildDashboard(raw) {
     const asset = assetsById.get(assetId);
     if (!asset) continue;
     const ledger = movingLedger(rows);
+    const capitalRecovery = buildCapitalRecoveryHistory(rows, { quantityScale: asset.quantity_scale });
     const lastRow = [...rows].sort((a, b) => String(b.trade_date).localeCompare(String(a.trade_date)) || String(b.created_at).localeCompare(String(a.created_at)))[0];
     const tradeCurrency = rows.find((row) => ["buy", "sell"].includes(row.transaction_type))?.settlement_currency || asset.quote_currency;
     const price = latestPrices.get(asset.id) || latestPrices.get(String(asset.symbol).toUpperCase());
@@ -478,6 +481,7 @@ function buildDashboard(raw) {
       soldProceedsUsd: toUsd(ledger.soldProceeds * costFx),
       lastTransactionDate: lastRow?.trade_date || null,
       lastTransactionType: lastRow?.transaction_type || null,
+      capitalRecovery,
       primarySector: asset.metadata?.primary_sector || "其他／待分類",
       subTheme: asset.metadata?.sub_theme || "未分類",
       isClosed: Math.abs(ledger.quantity) < 1e-10,
@@ -767,6 +771,14 @@ function supportsDollarDisplay(position) {
   return position.assetClass === "crypto";
 }
 
+function capitalRecoveryStatus(history) {
+  if (!history || history.status === "empty") return "";
+  if (history.status === "currency_mismatch") return "回本歷程：結算幣別待核對";
+  if (history.activeCycle) return `第 ${history.activeCycle.number} 輪回本中 · 尚待回收 ${money(history.activeCycle.outstandingAmount, history.settlementCurrency || "TWD")}`;
+  if (history.zeroCostCount) return `已完成第 ${history.zeroCostCount} 次零成本 · 目前維持零成本`;
+  return "已清倉 · 未建立零成本持倉";
+}
+
 function positionCard(position) {
   const details = document.createElement("details");
   details.className = "position-card";
@@ -804,6 +816,10 @@ function positionCard(position) {
     { type: "buy", label: `買入 ${buyCount} 筆`, hidden: buyCount === 0 },
     { type: "sell", label: `賣出 ${sellCount} 筆`, hidden: sellCount === 0 }
   ].filter((action) => !action.hidden).map((action) => `<button class="position-ledger-button" type="button" data-asset-ledger="${escapeHtml(position.id)}" data-symbol="${escapeHtml(position.symbol)}" data-transaction-type="${action.type}">${action.label}</button>`).join("");
+  const recoveryStatus = capitalRecoveryStatus(position.capitalRecovery);
+  const recoveryAction = position.capitalRecovery?.status !== "empty"
+    ? `<button class="position-ledger-button" type="button" data-capital-recovery-asset-id="${escapeHtml(position.id)}">本金回收歷程</button>`
+    : "";
   details.innerHTML = `
     <summary>
       <span class="position-identity">
@@ -835,14 +851,66 @@ function positionCard(position) {
       <span class="position-detail"><span>主題</span><strong>${escapeHtml(position.subTheme)}</strong></span>
       <span class="position-detail"><span>行情時間</span><strong>${dateTime(position.marketPriceAt)}</strong></span>
     </div>
+    ${recoveryStatus ? `<p class="capital-recovery-status private-number">${escapeHtml(recoveryStatus)}</p>` : ""}
     <div class="position-ledger-actions" aria-label="${escapeHtml(position.displaySymbol)} 成交紀錄篩選">
-      ${ledgerActions}
+      ${recoveryAction}${ledgerActions}
     </div>`;
   details.addEventListener("toggle", () => {
     if (details.open) state.positionExpandedIds.add(position.id);
     else state.positionExpandedIds.delete(position.id);
   });
   return details;
+}
+
+function recoveryCycleLabel(cycle) {
+  if (cycle.status === "zero_cost") return `第 ${cycle.number} 次零成本`;
+  if (cycle.status === "recovering") return `第 ${cycle.number} 輪回本中`;
+  if (cycle.status === "closed_after_recovery") return `第 ${cycle.number} 輪已清倉（本金已回收）`;
+  return `第 ${cycle.number} 輪已清倉（未完全回本）`;
+}
+
+function renderCapitalRecoveryDetails(position) {
+  const history = position.capitalRecovery;
+  const current = byId("capital-recovery-current");
+  const timeline = byId("capital-recovery-timeline");
+  if (!history || history.status === "empty") {
+    current.innerHTML = '<div class="empty-state">這個標的還沒有足以推導回本歷程的買賣資料。</div>';
+    timeline.innerHTML = "";
+    return;
+  }
+  if (history.status === "currency_mismatch") {
+    current.innerHTML = '<div class="empty-state">同一標的含不同結算幣別的交易，暫不合併推導本金回收。</div>';
+    timeline.innerHTML = "";
+    return;
+  }
+  const currency = history.settlementCurrency || position.tradeCurrency || position.quoteCurrency || "TWD";
+  if (history.activeCycle) {
+    const cycle = history.activeCycle;
+    current.innerHTML = `<span>目前進度</span><strong>${escapeHtml(recoveryCycleLabel(cycle))}</strong><small>本輪投入 <b class="private-number">${money(cycle.investedAmount, currency)}</b> · 已回收 <b class="private-number">${money(cycle.recoveredAmount, currency)}</b> · 尚待 <b class="private-number">${money(cycle.outstandingAmount, currency)}</b></small>`;
+  } else if (history.zeroCostCount) {
+    current.innerHTML = `<span>目前狀態</span><strong>已完成第 ${history.zeroCostCount} 次零成本</strong><small>下一筆加倉會開啟新的回本輪次，舊輪次的超額獲利不會抵銷新成本。</small>`;
+  } else {
+    current.innerHTML = '<span>目前狀態</span><strong>已清倉</strong><small>這段持有期間尚未形成保留持股的零成本時點。</small>';
+  }
+  timeline.innerHTML = `${history.cycles.map((cycle) => {
+    const isZeroCost = cycle.status === "zero_cost";
+    const isActive = cycle.status === "recovering";
+    const ending = isActive ? `尚待 ${money(cycle.outstandingAmount, currency)}` : isZeroCost ? `保留 ${quantity(cycle.remainingQuantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}` : cycle.status === "closed_after_recovery" ? "本金已回收" : `尚差 ${money(cycle.outstandingAmount, currency)}`;
+    return `<article class="capital-recovery-cycle ${isActive ? "is-active" : ""} ${isZeroCost ? "is-zero-cost" : ""}">
+      <header><span><strong>${escapeHtml(recoveryCycleLabel(cycle))}</strong><small>${escapeHtml(shortDate(cycle.startedOn))}${cycle.completedOn ? ` → ${escapeHtml(shortDate(cycle.completedOn))}` : ""}</small></span><b class="private-number">${ending}</b></header>
+      <p>本輪加倉 <b class="private-number">${quantity(cycle.buyQuantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</b> · 實付 <b class="private-number">${money(cycle.investedAmount, currency)}</b></p>
+      <p>回收賣出 <b class="private-number">${quantity(cycle.soldQuantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</b> · 實收 <b class="private-number">${money(cycle.recoveredAmount, currency)}</b></p>
+      ${isZeroCost ? `<p>達標賣出 <b class="private-number">${quantity(cycle.triggerSellQuantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</b> · 實收 <b class="private-number">${money(cycle.triggerSellAmount, currency)}</b></p><p>達標當時保留 <b class="private-number">${quantity(cycle.retainedAtZeroCost, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</b>${cycle.remainingQuantity !== cycle.retainedAtZeroCost ? ` · 目前剩餘 <b class="private-number">${quantity(cycle.remainingQuantity, position.quantityScale)} ${escapeHtml(position.quantityUnit || "")}</b>` : ""}</p>` : ""}
+    </article>`;
+  }).join("")}<p class="capital-recovery-note">僅以買入實付與賣出實收推導；股息、轉帳與手續費不計入回收金額。原有成本與損益數字不受影響。</p>`;
+}
+
+function openCapitalRecoveryDetails(assetId) {
+  const position = state.data?.allPositions?.find((row) => row.id === assetId);
+  if (!position) return;
+  byId("capital-recovery-title").textContent = `${position.displaySymbol} 本金回收歷程`;
+  renderCapitalRecoveryDetails(position);
+  openSheet("capital-recovery-sheet");
 }
 
 function escapeHtml(value) {
@@ -1449,7 +1517,7 @@ function closeCashbookForm() {
 }
 
 function openSheet(id) { byId(id).hidden = false; document.body.classList.add("sheet-open"); }
-function closeSheet(id) { byId(id).hidden = true; if (byId("cashbook-sheet").hidden && byId("cashbook-schedule-sheet").hidden && byId("cashbook-account-sheet").hidden && byId("property-cost-details-sheet").hidden) document.body.classList.remove("sheet-open"); }
+function closeSheet(id) { byId(id).hidden = true; if (byId("cashbook-sheet").hidden && byId("cashbook-schedule-sheet").hidden && byId("cashbook-account-sheet").hidden && byId("property-cost-details-sheet").hidden && byId("capital-recovery-sheet").hidden) document.body.classList.remove("sheet-open"); }
 
 function scheduleOptions(selected = {}) {
   const normal = state.cashbook.accounts.filter((a) => a.status === "active" && !["asset_cost", "investment_bridge"].includes(a.account_type));
@@ -2007,6 +2075,8 @@ document.addEventListener("click", (event) => {
   if (scheduleRow) { openScheduleSheet(state.cashbook.schedules.find((row) => row.id === scheduleRow.dataset.cashbookScheduleId) || null); return; }
   const propertyDetailsButton = event.target.closest("[data-property-cost-details-account-id]");
   if (propertyDetailsButton) { void openPropertyCostDetails(propertyDetailsButton.dataset.propertyCostDetailsAccountId); return; }
+  const capitalRecoveryButton = event.target.closest("[data-capital-recovery-asset-id]");
+  if (capitalRecoveryButton) { openCapitalRecoveryDetails(capitalRecoveryButton.dataset.capitalRecoveryAssetId); return; }
   const accountRow = event.target.closest("[data-cashbook-account-id]");
   if (accountRow) { openAccountSheet(cashbookAccount(accountRow.dataset.cashbookAccountId)); return; }
   const button = event.target.closest("[data-asset-ledger]");
@@ -2042,6 +2112,8 @@ byId("cashbook-account-close").addEventListener("click", () => closeSheet("cashb
 byId("cashbook-account-sheet").addEventListener("click", (event) => { if (event.target === byId("cashbook-account-sheet")) closeSheet("cashbook-account-sheet"); });
 byId("property-cost-details-close").addEventListener("click", () => closeSheet("property-cost-details-sheet"));
 byId("property-cost-details-sheet").addEventListener("click", (event) => { if (event.target === byId("property-cost-details-sheet")) closeSheet("property-cost-details-sheet"); });
+byId("capital-recovery-close").addEventListener("click", () => closeSheet("capital-recovery-sheet"));
+byId("capital-recovery-sheet").addEventListener("click", (event) => { if (event.target === byId("capital-recovery-sheet")) closeSheet("capital-recovery-sheet"); });
 byId("cashbook-account-form").addEventListener("submit", saveAccount);
 byId("cashbook-close-button").addEventListener("click", closeCashbookForm);
 byId("cashbook-sheet").addEventListener("click", (event) => { if (event.target === byId("cashbook-sheet")) closeCashbookForm(); });

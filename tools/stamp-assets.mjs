@@ -13,4 +13,8 @@ for (const asset of ["styles.css", "config.js", "app.js"]) {
   html = html.replace(new RegExp(`${asset.replace(".", "\\.")}(?:\\?v=[^\"']+)?`, "g"), `${asset}?v=${version}`);
 }
 await fs.writeFile(indexPath, html);
+const appPath = path.join(root, "app.js");
+let app = await fs.readFile(appPath, "utf8");
+app = app.replace(/\.\/capital-recovery\.mjs(?:\?v=[^"']+)?/g, `./capital-recovery.mjs?v=${version}`);
+await fs.writeFile(appPath, app);
 console.log(`Stamped static assets with ${version}`);

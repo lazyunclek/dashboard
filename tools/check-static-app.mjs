@@ -4,7 +4,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const required = ["index.html", "styles.css", "app.js", "config.js", "manifest.webmanifest", "icon.svg", ".github/workflows/pages.yml", "tools/stamp-assets.mjs"];
+const required = ["index.html", "styles.css", "app.js", "capital-recovery.mjs", "config.js", "manifest.webmanifest", "icon.svg", ".github/workflows/pages.yml", "tools/stamp-assets.mjs", "tools/check-capital-recovery.mjs"];
 for (const file of required) await fs.access(path.join(root, file));
 
 const [html, css, app, config, workflow] = await Promise.all([
@@ -27,6 +27,9 @@ for (const token of ["pnlPercent", "unrealizedPnlPct.toFixed(2)"]) {
 }
 for (const behavior of ["positionExpandedIds", "details.open = state.positionExpandedIds.has(position.id)", "details.addEventListener(\"toggle\""]) {
   if (!app.includes(behavior)) throw new Error(`Missing expanded-position state preservation: ${behavior}`);
+}
+for (const behavior of ["buildCapitalRecoveryHistory", "capital-recovery-sheet", "openCapitalRecoveryDetails", "data-capital-recovery-asset-id", "本金回收歷程"]) {
+  if (!app.includes(behavior) && !html.includes(behavior)) throw new Error(`Missing capital recovery behavior: ${behavior}`);
 }
 for (const behavior of ["function supportsDollarDisplay", 'position.assetClass === "crypto"', "marketValueUsd", "unrealizedPnlUsd", "usesNativeUsd"]) {
   if (!app.includes(behavior)) throw new Error(`Missing crypto USD display behavior: ${behavior}`);
