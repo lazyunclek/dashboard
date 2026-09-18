@@ -83,6 +83,9 @@ for (const source of ["cashbook_accounts", "cashbook_account_balances", "cashboo
 for (const behavior of ["armedDate", "openCashbookForm", "saveCashbookEvent", "loadCashbook", "investment_mobile", "property_cost_recovery", "openScheduleSheet", "saveSchedule", "openAccountSheet", "saveAccount"]) {
   if (!app.includes(behavior)) throw new Error(`Missing mobile cashbook behavior: ${behavior}`);
 }
+for (const behavior of ["cashbook-card-obligations", "renderCashbookCardObligations", "信用卡待繳", "已發生負債，不納入預定款項"]) {
+  if (!app.includes(behavior) && !html.includes(behavior)) throw new Error(`Missing credit-card obligation behavior: ${behavior}`);
+}
 for (const behavior of ['activeTab: "cashbook"', "renderCashbookSummaries", "cashbookExpenseTwd", "row.note"]) {
   if (!app.includes(behavior)) throw new Error(`Missing cashbook privacy or reporting behavior: ${behavior}`);
 }

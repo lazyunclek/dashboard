@@ -1234,9 +1234,24 @@ function scheduleLabel(row) {
   return row.next_due_on ? `預計 ${row.next_due_on}` : "單次款項";
 }
 
+function renderCashbookCardObligations() {
+  const container = byId("cashbook-card-obligations");
+  const cards = state.cashbook.accounts
+    .filter((account) => account.status === "active" && account.account_type === "credit_card")
+    .map((account) => ({ ...account, outstanding: Math.max(0, -num(account.balance)) }));
+  if (!cards.length) {
+    container.hidden = true;
+    container.replaceChildren();
+    return;
+  }
+  container.hidden = false;
+  container.innerHTML = `<div class="cashbook-obligation-heading"><span>信用卡待繳</span><small>已發生負債，不納入預定款項</small></div>${cards.map((card) => `<article class="cashbook-account-row cashbook-card-obligation ${card.outstanding > 0 ? "is-outstanding" : ""}"><span class="cashbook-account-copy"><strong>${escapeHtml(card.name)}</strong><small>帳本目前待繳 · 實際繳款日與帳單金額請以銀行帳單為準</small></span><span class="cashbook-account-balance-wrap"><b class="cashbook-account-balance private-number">${cashbookMoney(card.outstanding, card.currency)}</b><small class="cashbook-account-projection">${card.outstanding > 0 ? "待繳" : "目前無待繳"}</small></span></article>`).join("")}`;
+}
+
 function renderCashbookSchedules() {
   const list = byId("cashbook-schedule-list");
   list.replaceChildren();
+  renderCashbookCardObligations();
   const rows = state.cashbook.schedules.filter((row) => ["active", "paused"].includes(row.status));
   if (!rows.length) { list.innerHTML = '<div class="empty-state">尚未建立預定款項。預定只提示未來現金流，不會先扣減餘額。</div>'; return; }
   const today = localDateKey();
