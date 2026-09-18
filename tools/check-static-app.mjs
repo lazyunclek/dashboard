@@ -4,7 +4,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const required = ["index.html", "styles.css", "app.js", "capital-recovery.mjs", "config.js", "manifest.webmanifest", "icon.svg", ".github/workflows/pages.yml", "tools/stamp-assets.mjs", "tools/check-capital-recovery.mjs"];
+const required = ["index.html", "styles.css", "app.js", "capital-recovery.mjs", "credit-card-reserves.mjs", "config.js", "manifest.webmanifest", "icon.svg", ".github/workflows/pages.yml", "tools/stamp-assets.mjs", "tools/check-capital-recovery.mjs", "tools/check-credit-card-reserves.mjs"];
 for (const file of required) await fs.access(path.join(root, file));
 
 const [html, css, app, config, workflow] = await Promise.all([
@@ -72,7 +72,7 @@ if (/service[_-]?role|SUPABASE_SERVICE_ROLE|secret[_-]?key/i.test(`${app}\n${con
 if (/method:\s*["'](?:PATCH|PUT|DELETE)["']/i.test(app)) throw new Error("Investment mutation method found");
 const postCalls = [...app.matchAll(/method:\s*["']POST["']/gi)].length;
 if (postCalls !== 3 || !app.includes("/auth/v1/token") || !app.includes("/rest/v1/rpc/${name}")) throw new Error("Only Auth and the controlled RPC wrappers may use POST");
-for (const rpc of ["cashbook_ensure_defaults", "cashbook_event_save", "cashbook_event_delete", "cashbook_schedule_save", "cashbook_schedule_post", "cashbook_schedule_cancel", "cashbook_account_setup", "cashbook_account_update", "cashbook_account_reconcile"]) {
+for (const rpc of ["cashbook_ensure_defaults", "cashbook_event_save", "cashbook_event_delete", "cashbook_schedule_save", "cashbook_schedule_post", "cashbook_schedule_cancel", "cashbook_account_setup", "cashbook_account_update", "cashbook_account_reconcile", "cashbook_credit_card_payment_source_save"]) {
   if (!app.includes(`"${rpc}"`)) throw new Error(`Missing allowed cashbook RPC: ${rpc}`);
 }
 if (!app.includes("cashbookRpcNames.has(name)")) throw new Error("Cashbook RPC allowlist enforcement missing");
@@ -83,7 +83,7 @@ for (const source of ["cashbook_accounts", "cashbook_account_balances", "cashboo
 for (const behavior of ["armedDate", "openCashbookForm", "saveCashbookEvent", "loadCashbook", "investment_mobile", "property_cost_recovery", "openScheduleSheet", "saveSchedule", "openAccountSheet", "saveAccount"]) {
   if (!app.includes(behavior)) throw new Error(`Missing mobile cashbook behavior: ${behavior}`);
 }
-for (const behavior of ["cashbook-card-obligations", "renderCashbookCardObligations", "信用卡待繳", "已發生負債，不納入預定款項"]) {
+for (const behavior of ["cashbook-card-obligations", "renderCashbookCardObligations", "信用卡待繳", "信用卡扣款帳戶", "預估可動用", "credit_card_payment_source_account_id"]) {
   if (!app.includes(behavior) && !html.includes(behavior)) throw new Error(`Missing credit-card obligation behavior: ${behavior}`);
 }
 for (const behavior of ['activeTab: "cashbook"', "renderCashbookSummaries", "cashbookExpenseTwd", "row.note"]) {

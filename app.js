@@ -1,3 +1,5 @@
+import { scheduledCashProjection } from "./credit-card-reserves.mjs";
+
 const config = window.__INVESTMENT_DASHBOARD_CONFIG__;
 
 if (!config || !config.supabaseUrl || !config.supabasePublishableKey || config.supabaseUrl.startsWith("__")) {
@@ -124,7 +126,7 @@ async function rest(path, options = {}, retried = false) {
   return payload;
 }
 
-const cashbookRpcNames = new Set(["cashbook_ensure_defaults", "cashbook_event_save", "cashbook_event_delete", "cashbook_schedule_save", "cashbook_schedule_post", "cashbook_schedule_cancel", "cashbook_account_setup", "cashbook_account_update", "cashbook_account_reconcile"]);
+const cashbookRpcNames = new Set(["cashbook_ensure_defaults", "cashbook_event_save", "cashbook_event_delete", "cashbook_schedule_save", "cashbook_schedule_post", "cashbook_schedule_cancel", "cashbook_account_setup", "cashbook_account_update", "cashbook_account_reconcile", "cashbook_credit_card_payment_source_save"]);
 
 async function cashbookRpc(name, body = {}, retried = false) {
   if (!cashbookRpcNames.has(name)) throw new Error("不允許的日常帳本操作");
@@ -1060,16 +1062,7 @@ function cashbookEvent(eventId) {
 }
 
 function scheduledAccountProjection(accountId) {
-  let net = 0;
-  let count = 0;
-  for (const schedule of state.cashbook.schedules) {
-    if (schedule.status !== "active") continue;
-    let delta = 0;
-    if (schedule.source_account_id === accountId && ["expense", "transfer", "credit_card_payment", "investment_funding_transfer"].includes(schedule.event_type)) delta -= num(schedule.amount);
-    if (schedule.destination_account_id === accountId && ["transfer", "credit_card_payment", "investment_funding_transfer"].includes(schedule.event_type)) delta += num(schedule.amount);
-    if (delta) { net += delta; count += 1; }
-  }
-  return { net, count };
+  return scheduledCashProjection(state.cashbook.accounts, state.cashbook.schedules, accountId);
 }
 
 async function loadCashbook() {
@@ -1149,8 +1142,11 @@ function renderCashbookAccounts() {
         : cashbookAccountTypeLabels[account.account_type] || account.account_type;
       const projection = scheduledAccountProjection(account.id);
       const projectedBalance = num(account.balance) + projection.net;
+      const cardReserveHint = projection.cardReserves.length
+        ? `<small class="cashbook-account-projection">預留 ${projection.cardReserves.map((reserve) => `${escapeHtml(reserve.name)} ${cashbookMoney(reserve.amount, reserve.currency)}`).join("、")}</small>`
+        : "";
       const projectionHint = projection.count
-        ? `<small class="cashbook-account-projection ${projectedBalance < 0 ? "is-negative" : ""}">含 ${projection.count} 筆預定後：${cashbookMoney(projectedBalance, account.currency)}</small>`
+        ? `<small class="cashbook-account-projection ${projectedBalance < 0 ? "is-negative" : ""}">${projection.cardReserves.length ? "預估可動用" : `含 ${projection.scheduleCount} 筆預定後`}：${cashbookMoney(projectedBalance, account.currency)}</small>${cardReserveHint}`
         : "";
       row.innerHTML = `<span class="cashbook-account-copy"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.currency)} · ${escapeHtml(accountKind)}</small></span>${isPropertyAccount ? `<button class="property-details-button" type="button" data-property-cost-details-account-id="${account.id}">查看細節</button>` : ""}<span class="cashbook-account-balance-wrap"><b class="cashbook-account-balance private-number">${cashbookMoney(account.balance, account.currency)}</b>${projectionHint}</span>`;
       section.append(row);
@@ -1245,7 +1241,16 @@ function renderCashbookCardObligations() {
     return;
   }
   container.hidden = false;
-  container.innerHTML = `<div class="cashbook-obligation-heading"><span>信用卡待繳</span><small>已發生負債，不納入預定款項</small></div>${cards.map((card) => `<article class="cashbook-account-row cashbook-card-obligation ${card.outstanding > 0 ? "is-outstanding" : ""}"><span class="cashbook-account-copy"><strong>${escapeHtml(card.name)}</strong><small>帳本目前待繳 · 實際繳款日與帳單金額請以銀行帳單為準</small></span><span class="cashbook-account-balance-wrap"><b class="cashbook-account-balance private-number">${cashbookMoney(card.outstanding, card.currency)}</b><small class="cashbook-account-projection">${card.outstanding > 0 ? "待繳" : "目前無待繳"}</small></span></article>`).join("")}`;
+  container.innerHTML = `<div class="cashbook-obligation-heading"><span>信用卡待繳</span><small>已發生負債；連結扣款帳戶後會預留可動用現金</small></div>${cards.map((card) => {
+    const paymentSource = cashbookAccount(card.credit_card_payment_source_account_id);
+    const fixedPayment = state.cashbook.schedules.find((schedule) => schedule.status === "active" && schedule.event_type === "credit_card_payment" && schedule.source_account_id === paymentSource?.id && schedule.destination_account_id === card.id);
+    const sourceCopy = paymentSource
+      ? fixedPayment
+        ? `扣款自 ${paymentSource.name} · 已改採預定「${fixedPayment.title}」的固定金額預留`
+        : `預留自 ${paymentSource.name} · 待繳變動會同步更新該帳戶的預估可動用`
+      : "尚未指定扣款帳戶 · 點此設定";
+    return `<button type="button" data-cashbook-account-id="${card.id}" class="cashbook-account-row cashbook-card-obligation ${card.outstanding > 0 ? "is-outstanding" : ""}"><span class="cashbook-account-copy"><strong>${escapeHtml(card.name)}</strong><small>${escapeHtml(sourceCopy)}</small></span><span class="cashbook-account-balance-wrap"><b class="cashbook-account-balance private-number">${cashbookMoney(card.outstanding, card.currency)}</b><small class="cashbook-account-projection">${card.outstanding > 0 ? "目前待繳" : "目前無待繳"}</small></span></button>`;
+  }).join("")}`;
 }
 
 function renderCashbookSchedules() {
@@ -1689,8 +1694,20 @@ function openAccountSheet(account = null) {
   byId("cashbook-account-title").textContent = account ? "帳戶明細與對帳" : "新增帳戶";
   byId("account-name").value = account?.name || ""; byId("account-type").value = account?.account_type || "bank"; byId("account-currency").value = account?.currency || "TWD"; byId("account-institution").value = account?.institution || ""; byId("account-note").value = account?.note || ""; byId("account-opening").value = 0; byId("account-actual-balance").value = account?.balance ?? "";
   byId("account-type-field").hidden = Boolean(account); byId("account-currency-field").hidden = Boolean(account); byId("account-opening-field").hidden = Boolean(account); byId("account-reconcile-field").hidden = !account;
+  refreshAccountPaymentSourceOptions(account);
   byId("cashbook-account-status").textContent = account ? `目前帳本餘額：${cashbookMoney(account.balance, account.currency)}` : "";
   openSheet("cashbook-account-sheet");
+}
+
+function refreshAccountPaymentSourceOptions(account = state.cashbook.editingAccount) {
+  const field = byId("account-payment-source-field");
+  const select = byId("account-payment-source");
+  const isCreditCard = (account?.account_type || byId("account-type").value) === "credit_card";
+  field.hidden = !isCreditCard;
+  if (!isCreditCard) return;
+  const eligible = state.cashbook.accounts.filter((candidate) => candidate.status === "active" && candidate.id !== account?.id && ["cash", "bank", "electronic_payment", "debit_card"].includes(candidate.account_type) && candidate.currency === (account?.currency || byId("account-currency").value));
+  select.innerHTML = `<option value="">尚未設定</option>${eligible.map((candidate) => `<option value="${candidate.id}">${escapeHtml(candidate.name)} · ${escapeHtml(candidate.currency)}</option>`).join("")}`;
+  select.value = account?.credit_card_payment_source_account_id || "";
 }
 
 async function saveAccount(event) {
@@ -1698,6 +1715,7 @@ async function saveAccount(event) {
   try {
     if (editing) {
       await cashbookRpc("cashbook_account_update", { p_id: editing.id, p_name: byId("account-name").value.trim(), p_institution: byId("account-institution").value.trim() || null, p_note: byId("account-note").value.trim() || null, p_status: "active" });
+      if (editing.account_type === "credit_card") await cashbookRpc("cashbook_credit_card_payment_source_save", { p_card_account_id: editing.id, p_payment_source_account_id: byId("account-payment-source").value || null });
       const actual = num(byId("account-actual-balance").value);
       if (Number.isFinite(actual) && actual !== num(editing.balance)) await cashbookRpc("cashbook_account_reconcile", { p_account_id: editing.id, p_actual_balance: actual, p_note: "手機帳戶對帳" });
     } else await cashbookRpc("cashbook_account_setup", { p_name: byId("account-name").value.trim(), p_account_type: byId("account-type").value, p_currency: byId("account-currency").value, p_institution: byId("account-institution").value.trim() || null, p_note: byId("account-note").value.trim() || null, p_opening_balance: num(byId("account-opening").value) || 0 });
@@ -2205,6 +2223,7 @@ byId("property-cost-details-sheet").addEventListener("click", (event) => { if (e
 byId("capital-recovery-close").addEventListener("click", () => closeSheet("capital-recovery-sheet"));
 byId("capital-recovery-sheet").addEventListener("click", (event) => { if (event.target === byId("capital-recovery-sheet")) closeSheet("capital-recovery-sheet"); });
 byId("cashbook-account-form").addEventListener("submit", saveAccount);
+byId("account-type").addEventListener("change", () => refreshAccountPaymentSourceOptions());
 byId("cashbook-close-button").addEventListener("click", closeCashbookForm);
 byId("cashbook-sheet").addEventListener("click", (event) => { if (event.target === byId("cashbook-sheet")) closeCashbookForm(); });
 byId("cashbook-form").addEventListener("submit", saveCashbookEvent);
