@@ -1147,7 +1147,7 @@ function renderCashbookAccounts() {
         ? `<small class="cashbook-account-projection">預留 ${projection.cardReserves.map((reserve) => `${escapeHtml(reserve.name)} ${cashbookMoney(reserve.amount, reserve.currency)}`).join("、")}</small>`
         : "";
       const projectionHint = projection.count
-        ? `<small class="cashbook-account-projection ${projectedBalance < 0 ? "is-negative" : ""}">${projection.cardReserves.length ? "預估可動用" : `含 ${projection.scheduleCount} 筆預定後`}：${cashbookMoney(projectedBalance, account.currency)}</small>${cardReserveHint}`
+        ? `<small class="cashbook-account-projection ${projectedBalance < 0 ? "is-negative" : ""}">預估可動用：${cashbookMoney(projectedBalance, account.currency)}</small>${cardReserveHint}`
         : "";
       row.innerHTML = `<span class="cashbook-account-copy"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.currency)} · ${escapeHtml(accountKind)}</small></span>${isPropertyAccount ? `<button class="property-details-button" type="button" data-property-cost-details-account-id="${account.id}">查看細節</button>` : hasAvailabilityDetail ? `<button class="property-details-button" type="button" data-cashbook-availability-account-id="${account.id}">預留明細</button>` : ""}<span class="cashbook-account-balance-wrap"><b class="cashbook-account-balance private-number">${cashbookMoney(account.balance, account.currency)}</b>${projectionHint}</span>`;
       section.append(row);
