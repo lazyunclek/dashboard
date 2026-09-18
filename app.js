@@ -1134,25 +1134,39 @@ function renderCashbookAccounts() {
     section.innerHTML = `<div class="cashbook-account-group-title"><span>${escapeHtml(title)}</span><strong class="private-number">${escapeHtml(summary)}</strong></div>`;
     for (const account of rows) {
       const isPropertyAccount = account.account_type === "asset_cost" && account.asset_class === "real_estate";
-      const row = document.createElement(isPropertyAccount ? "div" : "button");
-      if (!isPropertyAccount) { row.type = "button"; row.dataset.cashbookAccountId = account.id; }
-      row.className = `cashbook-account-row ${isPropertyAccount ? "is-property-account" : ""} ${num(account.balance) < 0 ? "is-negative" : ""}`;
       const accountKind = account.account_type === "asset_cost"
         ? cashbookAssetClassLabels[account.asset_class] || "資產成本"
         : cashbookAccountTypeLabels[account.account_type] || account.account_type;
       const projection = scheduledAccountProjection(account.id);
       const projectedBalance = num(account.balance) + projection.net;
+      const hasAvailabilityDetail = projection.count > 0;
+      const row = document.createElement(isPropertyAccount || hasAvailabilityDetail ? "div" : "button");
+      if (!isPropertyAccount && !hasAvailabilityDetail) { row.type = "button"; row.dataset.cashbookAccountId = account.id; }
+      row.className = `cashbook-account-row ${isPropertyAccount ? "is-property-account" : ""} ${hasAvailabilityDetail ? "is-availability-account" : ""} ${num(account.balance) < 0 ? "is-negative" : ""}`;
       const cardReserveHint = projection.cardReserves.length
         ? `<small class="cashbook-account-projection">預留 ${projection.cardReserves.map((reserve) => `${escapeHtml(reserve.name)} ${cashbookMoney(reserve.amount, reserve.currency)}`).join("、")}</small>`
         : "";
       const projectionHint = projection.count
         ? `<small class="cashbook-account-projection ${projectedBalance < 0 ? "is-negative" : ""}">${projection.cardReserves.length ? "預估可動用" : `含 ${projection.scheduleCount} 筆預定後`}：${cashbookMoney(projectedBalance, account.currency)}</small>${cardReserveHint}`
         : "";
-      row.innerHTML = `<span class="cashbook-account-copy"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.currency)} · ${escapeHtml(accountKind)}</small></span>${isPropertyAccount ? `<button class="property-details-button" type="button" data-property-cost-details-account-id="${account.id}">查看細節</button>` : ""}<span class="cashbook-account-balance-wrap"><b class="cashbook-account-balance private-number">${cashbookMoney(account.balance, account.currency)}</b>${projectionHint}</span>`;
+      row.innerHTML = `<span class="cashbook-account-copy"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.currency)} · ${escapeHtml(accountKind)}</small></span>${isPropertyAccount ? `<button class="property-details-button" type="button" data-property-cost-details-account-id="${account.id}">查看細節</button>` : hasAvailabilityDetail ? `<button class="property-details-button" type="button" data-cashbook-availability-account-id="${account.id}">預留明細</button>` : ""}<span class="cashbook-account-balance-wrap"><b class="cashbook-account-balance private-number">${cashbookMoney(account.balance, account.currency)}</b>${projectionHint}</span>`;
       section.append(row);
     }
     strip.append(section);
   }
+}
+
+function openCashbookAvailabilityDetails(accountId) {
+  const account = cashbookAccount(accountId);
+  if (!account) return;
+  const projection = scheduledAccountProjection(account.id);
+  const projectedBalance = num(account.balance) + projection.net;
+  byId("cashbook-availability-title").textContent = `${account.name}預留明細`;
+  byId("cashbook-availability-summary").innerHTML = `<div class="property-cost-total"><span>預估可動用</span><strong class="private-number">${cashbookMoney(projectedBalance, account.currency)}</strong><small>正式餘額 ${cashbookMoney(account.balance, account.currency)}；不會提前入帳</small></div><div><span>預定款項淨額</span><strong class="private-number">${cashbookMoney(projection.scheduleRows.reduce((sum, row) => sum + row.delta, 0), account.currency, true)}</strong></div><div><span>信用卡待繳預留</span><strong class="private-number">${cashbookMoney(-projection.cardReserves.reduce((sum, reserve) => sum + reserve.amount, 0), account.currency, true)}</strong></div>`;
+  const scheduleRows = projection.scheduleRows.map((schedule) => `<article class="property-cost-detail-row is-scheduled"><span><strong>${escapeHtml(schedule.title)}</strong><small>${escapeHtml(scheduleLabel(schedule))} · ${schedule.delta < 0 ? "預定扣款" : "預定入帳"}</small></span><b class="property-cost-detail-amount private-number">${cashbookMoney(schedule.delta, account.currency, true)}</b></article>`).join("");
+  const cardRows = projection.cardReserves.map((reserve) => `<article class="property-cost-detail-row is-scheduled"><span><strong>${escapeHtml(reserve.name)}</strong><small>信用卡目前待繳 · 動態預留</small></span><b class="property-cost-detail-amount private-number">${cashbookMoney(-reserve.amount, reserve.currency, true)}</b></article>`).join("");
+  byId("cashbook-availability-list").innerHTML = `${projection.scheduleRows.length ? `<h3 class="property-cost-detail-heading">預定款項</h3>${scheduleRows}` : ""}${projection.cardReserves.length ? `<h3 class="property-cost-detail-heading">信用卡待繳</h3>${cardRows}` : ""}` || '<div class="empty-state">這個帳戶目前沒有預留項目。</div>';
+  openSheet("cashbook-availability-sheet");
 }
 
 function propertyCostEventAmount(row) {
@@ -1607,7 +1621,7 @@ function openSheet(id) {
 
 function closeSheet(id) {
   byId(id).hidden = true;
-  const allSheetsClosed = byId("cashbook-sheet").hidden && byId("cashbook-schedule-sheet").hidden && byId("cashbook-account-sheet").hidden && byId("property-cost-details-sheet").hidden && byId("capital-recovery-sheet").hidden;
+  const allSheetsClosed = byId("cashbook-sheet").hidden && byId("cashbook-schedule-sheet").hidden && byId("cashbook-account-sheet").hidden && byId("property-cost-details-sheet").hidden && byId("cashbook-availability-sheet").hidden && byId("capital-recovery-sheet").hidden;
   if (!allSheetsClosed) return;
   document.body.classList.remove("sheet-open");
   document.body.style.top = "";
@@ -2187,6 +2201,8 @@ document.addEventListener("click", (event) => {
   if (scheduleRow) { openScheduleSheet(state.cashbook.schedules.find((row) => row.id === scheduleRow.dataset.cashbookScheduleId) || null); return; }
   const propertyDetailsButton = event.target.closest("[data-property-cost-details-account-id]");
   if (propertyDetailsButton) { void openPropertyCostDetails(propertyDetailsButton.dataset.propertyCostDetailsAccountId); return; }
+  const availabilityDetailsButton = event.target.closest("[data-cashbook-availability-account-id]");
+  if (availabilityDetailsButton) { openCashbookAvailabilityDetails(availabilityDetailsButton.dataset.cashbookAvailabilityAccountId); return; }
   const capitalRecoveryButton = event.target.closest("[data-capital-recovery-asset-id]");
   if (capitalRecoveryButton) { openCapitalRecoveryDetails(capitalRecoveryButton.dataset.capitalRecoveryAssetId); return; }
   const accountRow = event.target.closest("[data-cashbook-account-id]");
@@ -2224,6 +2240,8 @@ byId("cashbook-account-close").addEventListener("click", () => closeSheet("cashb
 byId("cashbook-account-sheet").addEventListener("click", (event) => { if (event.target === byId("cashbook-account-sheet")) closeSheet("cashbook-account-sheet"); });
 byId("property-cost-details-close").addEventListener("click", () => closeSheet("property-cost-details-sheet"));
 byId("property-cost-details-sheet").addEventListener("click", (event) => { if (event.target === byId("property-cost-details-sheet")) closeSheet("property-cost-details-sheet"); });
+byId("cashbook-availability-close").addEventListener("click", () => closeSheet("cashbook-availability-sheet"));
+byId("cashbook-availability-sheet").addEventListener("click", (event) => { if (event.target === byId("cashbook-availability-sheet")) closeSheet("cashbook-availability-sheet"); });
 byId("capital-recovery-close").addEventListener("click", () => closeSheet("capital-recovery-sheet"));
 byId("capital-recovery-sheet").addEventListener("click", (event) => { if (event.target === byId("capital-recovery-sheet")) closeSheet("capital-recovery-sheet"); });
 byId("cashbook-account-form").addEventListener("submit", saveAccount);

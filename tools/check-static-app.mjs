@@ -15,7 +15,7 @@ const [html, css, app, config, workflow] = await Promise.all([
   fs.readFile(path.join(root, ".github/workflows/pages.yml"), "utf8")
 ]);
 
-for (const token of ["login-view", "dashboard-view", "positions-list", "transaction-search", "transaction-filters", "transaction-list", "current-cash", "running-grid-count", "cashbook-panel", "cashbook-calendar-grid", "cashbook-entry-list", "cashbook-day-expense", "cashbook-week-expense", "cashbook-month-expense", "cashbook-form", "cashbook-scheduled-view", "cashbook-schedule-form", "cashbook-account-form"]) {
+for (const token of ["login-view", "dashboard-view", "positions-list", "transaction-search", "transaction-filters", "transaction-list", "current-cash", "running-grid-count", "cashbook-panel", "cashbook-calendar-grid", "cashbook-entry-list", "cashbook-day-expense", "cashbook-week-expense", "cashbook-month-expense", "cashbook-form", "cashbook-scheduled-view", "cashbook-schedule-form", "cashbook-account-form", "cashbook-availability-sheet"]) {
   if (!html.includes(`id="${token}"`)) throw new Error(`Missing HTML target: ${token}`);
 }
 if (html.includes('id="top-positions"') || html.includes("主要持倉")) throw new Error("Overview must not duplicate the positions list");
@@ -83,7 +83,7 @@ for (const source of ["cashbook_accounts", "cashbook_account_balances", "cashboo
 for (const behavior of ["armedDate", "openCashbookForm", "saveCashbookEvent", "loadCashbook", "investment_mobile", "property_cost_recovery", "openScheduleSheet", "saveSchedule", "openAccountSheet", "saveAccount"]) {
   if (!app.includes(behavior)) throw new Error(`Missing mobile cashbook behavior: ${behavior}`);
 }
-for (const behavior of ["cashbook-card-obligations", "renderCashbookCardObligations", "信用卡待繳", "信用卡扣款帳戶", "預估可動用", "credit_card_payment_source_account_id", "目前待繳餘額（對帳）", "帳本目前待繳"]) {
+for (const behavior of ["cashbook-card-obligations", "renderCashbookCardObligations", "openCashbookAvailabilityDetails", "預留明細", "信用卡待繳", "信用卡扣款帳戶", "預估可動用", "credit_card_payment_source_account_id", "目前待繳餘額（對帳）", "帳本目前待繳"]) {
   if (!app.includes(behavior) && !html.includes(behavior)) throw new Error(`Missing credit-card obligation behavior: ${behavior}`);
 }
 for (const behavior of ['activeTab: "cashbook"', "renderCashbookSummaries", "cashbookExpenseTwd", "row.note"]) {

@@ -12,6 +12,7 @@ const scheduledCreditTypes = new Set(["transfer", "credit_card_payment", "invest
 export function scheduledCashProjection(accounts, schedules, accountId) {
   let net = 0;
   let scheduleCount = 0;
+  const scheduleRows = [];
   const activeSchedules = schedules.filter((schedule) => schedule.status === "active");
 
   for (const schedule of activeSchedules) {
@@ -21,6 +22,7 @@ export function scheduledCashProjection(accounts, schedules, accountId) {
     if (delta) {
       net += delta;
       scheduleCount += 1;
+      scheduleRows.push({ ...schedule, delta });
     }
   }
 
@@ -33,5 +35,5 @@ export function scheduledCashProjection(accounts, schedules, accountId) {
     cardReserves.push({ accountId: card.id, name: card.name, currency: card.currency, amount: outstanding });
   }
 
-  return { net, count: scheduleCount + cardReserves.length, scheduleCount, cardReserves };
+  return { net, count: scheduleCount + cardReserves.length, scheduleCount, scheduleRows, cardReserves };
 }

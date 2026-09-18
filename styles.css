@@ -450,6 +450,7 @@ input::placeholder { color: #53645a; }
 .cashbook-account-row { width: 100%; border-inline: 0; text-align: left; }
 button.cashbook-account-row { cursor: pointer; }
 .cashbook-account-row.is-property-account { grid-template-columns: minmax(0, 1fr) auto auto; }
+.cashbook-account-row.is-availability-account { grid-template-columns: minmax(0, 1fr) auto auto; }
 .property-details-button { min-height: 30px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 9px; color: var(--accent); background: transparent; font-size: 10px; font-weight: 750; white-space: nowrap; cursor: pointer; }
 .property-cost-details { display: grid; gap: 14px; padding: 16px; }
 .property-cost-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--line); }

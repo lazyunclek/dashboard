@@ -7,6 +7,7 @@ const card = { id: "card", name: "玉山 Pi 卡", status: "active", account_type
 const dynamic = scheduledCashProjection([bank, card], [{ id: "mortgage", status: "active", event_type: "expense", amount: 25000, source_account_id: "bank" }], "bank");
 assert.equal(dynamic.net, -43000, "linked card outstanding and ordinary schedule must both reserve bank cash");
 assert.equal(dynamic.scheduleCount, 1);
+assert.deepEqual(dynamic.scheduleRows.map((schedule) => schedule.delta), [-25000]);
 assert.deepEqual(dynamic.cardReserves.map((reserve) => reserve.amount), [18000]);
 
 const fixedPayment = scheduledCashProjection([bank, card], [{ id: "card-payment", status: "active", event_type: "credit_card_payment", amount: 15000, source_account_id: "bank", destination_account_id: "card" }], "bank");
