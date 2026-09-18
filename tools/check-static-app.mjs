@@ -83,7 +83,7 @@ for (const source of ["cashbook_accounts", "cashbook_account_balances", "cashboo
 for (const behavior of ["armedDate", "openCashbookForm", "saveCashbookEvent", "loadCashbook", "investment_mobile", "property_cost_recovery", "openScheduleSheet", "saveSchedule", "openAccountSheet", "saveAccount"]) {
   if (!app.includes(behavior)) throw new Error(`Missing mobile cashbook behavior: ${behavior}`);
 }
-for (const behavior of ["cashbook-card-obligations", "renderCashbookCardObligations", "信用卡待繳", "信用卡扣款帳戶", "預估可動用", "credit_card_payment_source_account_id"]) {
+for (const behavior of ["cashbook-card-obligations", "renderCashbookCardObligations", "信用卡待繳", "信用卡扣款帳戶", "預估可動用", "credit_card_payment_source_account_id", "目前待繳餘額（對帳）", "帳本目前待繳"]) {
   if (!app.includes(behavior) && !html.includes(behavior)) throw new Error(`Missing credit-card obligation behavior: ${behavior}`);
 }
 for (const behavior of ['activeTab: "cashbook"', "renderCashbookSummaries", "cashbookExpenseTwd", "row.note"]) {

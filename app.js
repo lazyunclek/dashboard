@@ -1691,11 +1691,15 @@ async function saveSchedule(event) {
 
 function openAccountSheet(account = null) {
   state.cashbook.editingAccount = account;
+  const isCreditCard = account?.account_type === "credit_card";
   byId("cashbook-account-title").textContent = account ? "帳戶明細與對帳" : "新增帳戶";
-  byId("account-name").value = account?.name || ""; byId("account-type").value = account?.account_type || "bank"; byId("account-currency").value = account?.currency || "TWD"; byId("account-institution").value = account?.institution || ""; byId("account-note").value = account?.note || ""; byId("account-opening").value = 0; byId("account-actual-balance").value = account?.balance ?? "";
+  byId("account-name").value = account?.name || ""; byId("account-type").value = account?.account_type || "bank"; byId("account-currency").value = account?.currency || "TWD"; byId("account-institution").value = account?.institution || ""; byId("account-note").value = account?.note || ""; byId("account-opening").value = 0; byId("account-actual-balance").value = isCreditCard ? Math.max(0, -num(account.balance)) : account?.balance ?? "";
+  byId("account-reconcile-label").textContent = isCreditCard ? "目前待繳餘額（對帳）" : "目前實際餘額（對帳）";
+  byId("account-reconcile-hint").textContent = isCreditCard ? "請輸入正數；儲存時只會以差額調整信用卡負債。" : "儲存時只會寫入差額調整。";
+  byId("account-actual-balance").min = isCreditCard ? "0" : "";
   byId("account-type-field").hidden = Boolean(account); byId("account-currency-field").hidden = Boolean(account); byId("account-opening-field").hidden = Boolean(account); byId("account-reconcile-field").hidden = !account;
   refreshAccountPaymentSourceOptions(account);
-  byId("cashbook-account-status").textContent = account ? `目前帳本餘額：${cashbookMoney(account.balance, account.currency)}` : "";
+  byId("cashbook-account-status").textContent = account ? isCreditCard ? `帳本目前待繳：${cashbookMoney(Math.max(0, -num(account.balance)), account.currency)}` : `目前帳本餘額：${cashbookMoney(account.balance, account.currency)}` : "";
   openSheet("cashbook-account-sheet");
 }
 
@@ -1716,7 +1720,7 @@ async function saveAccount(event) {
     if (editing) {
       await cashbookRpc("cashbook_account_update", { p_id: editing.id, p_name: byId("account-name").value.trim(), p_institution: byId("account-institution").value.trim() || null, p_note: byId("account-note").value.trim() || null, p_status: "active" });
       if (editing.account_type === "credit_card") await cashbookRpc("cashbook_credit_card_payment_source_save", { p_card_account_id: editing.id, p_payment_source_account_id: byId("account-payment-source").value || null });
-      const actual = num(byId("account-actual-balance").value);
+      const actual = editing.account_type === "credit_card" ? -num(byId("account-actual-balance").value) : num(byId("account-actual-balance").value);
       if (Number.isFinite(actual) && actual !== num(editing.balance)) await cashbookRpc("cashbook_account_reconcile", { p_account_id: editing.id, p_actual_balance: actual, p_note: "手機帳戶對帳" });
     } else await cashbookRpc("cashbook_account_setup", { p_name: byId("account-name").value.trim(), p_account_type: byId("account-type").value, p_currency: byId("account-currency").value, p_institution: byId("account-institution").value.trim() || null, p_note: byId("account-note").value.trim() || null, p_opening_balance: num(byId("account-opening").value) || 0 });
     closeSheet("cashbook-account-sheet"); showToast(editing ? "帳戶已更新" : "帳戶已建立"); await loadCashbook();
