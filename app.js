@@ -661,9 +661,16 @@ function buildDashboard(raw) {
   const propertyPurchasePriceTwd = num(propertyModel?.purchase_total_twd);
   const propertyTaxRate = num(propertyModel?.sale_tax_rate ?? (1 - num(propertyModel?.sale_profit_retention_rate ?? 0.55)));
   const propertyEstimatedTaxTwd = Math.max(propertySalePriceTwd - propertyPurchasePriceTwd, 0) * propertyTaxRate;
-  const propertyEstimatedProfitTwd = propertyModel
-    ? propertySalePriceTwd - propertyPurchasePriceTwd - propertyEstimatedTaxTwd
-    : num(propertyComponent?.unrealized_pnl_twd);
+  // The current property valuation summary persists the retained gain directly.
+  // Prefer it over the legacy sale-price formula: newer summaries use
+  // `estimated_sale_value_twd` rather than `future_sale_total_twd`, so applying
+  // the old formula would incorrectly treat the sale value as zero.
+  const retainedGain = propertyModel?.estimated_retained_gain_twd ?? propertyModel?.estimated_after_sale_profit_twd;
+  const propertyEstimatedProfitTwd = retainedGain !== null && retainedGain !== undefined
+    ? num(retainedGain)
+    : propertyModel
+      ? propertySalePriceTwd - propertyPurchasePriceTwd - propertyEstimatedTaxTwd
+      : num(propertyComponent?.unrealized_pnl_twd);
   const propertyValueTwd = propertyComponent
     ? propertyRecoverableTwd + propertyEstimatedProfitTwd
     : 0;
