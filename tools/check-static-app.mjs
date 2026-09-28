@@ -65,11 +65,12 @@ for (const token of ["function perSharePrice", 'assetClass === "tw_equity"', "am
 if (!app.includes("function spotPositionKey") || !app.includes("replace(/-(?:USD|USDT|USDC)$/")) throw new Error("Crypto spot alias deduplication missing");
 if (!app.includes("fetchLatestMarketPrices") || !app.includes("asset_id=eq.${encodeURIComponent(asset.id)}")) throw new Error("Latest per-asset market price query missing");
 if (app.includes("order=fetched_at.desc&limit=1000")) throw new Error("Global market-price truncation query must not be used");
-for (const query of ["investment_portfolios", "investment_assets", "investment_transactions", "investment_income_events", "investment_market_prices", "investment_portfolio_component_values", "investment_grid_records"]) {
+for (const query of ["investment_portfolios", "investment_assets", "investment_transactions", "investment_income_events", "investment_market_prices", "investment_portfolio_component_values", "investment_grid_records", "investment_property_valuation_assumptions"]) {
   if (!app.includes(query)) throw new Error(`Missing read source: ${query}`);
 }
 if (/service[_-]?role|SUPABASE_SERVICE_ROLE|secret[_-]?key/i.test(`${app}\n${config}`)) throw new Error("Privileged Supabase credential reference found");
-if (/method:\s*["'](?:PATCH|PUT|DELETE)["']/i.test(app)) throw new Error("Investment mutation method found");
+const investmentMutationMethods = [...app.matchAll(/method:\s*["'](?:PATCH|PUT|DELETE)["']/gi)];
+if (investmentMutationMethods.length !== 1 || !app.includes("investment_property_valuation_assumptions?id=eq.${encodeURIComponent(valuation.assumptionId)}")) throw new Error("Only the owner-scoped property valuation assumption may be updated from mobile");
 const postCalls = [...app.matchAll(/method:\s*["']POST["']/gi)].length;
 if (postCalls !== 3 || !app.includes("/auth/v1/token") || !app.includes("/rest/v1/rpc/${name}")) throw new Error("Only Auth and the controlled RPC wrappers may use POST");
 for (const rpc of ["cashbook_ensure_defaults", "cashbook_event_save", "cashbook_event_delete", "cashbook_schedule_save", "cashbook_schedule_post", "cashbook_schedule_cancel", "cashbook_account_setup", "cashbook_account_update", "cashbook_account_reconcile", "cashbook_credit_card_payment_source_save"]) {

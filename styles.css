@@ -470,6 +470,12 @@ button.cashbook-account-row { cursor: pointer; }
 .property-cost-scheduled { margin-top: 16px; padding-top: 2px; border-top: 1px solid var(--line-strong); }
 .property-cost-scheduled > p { margin: 0 0 2px; color: var(--muted); font-size: 10px; }
 .property-cost-detail-row.is-scheduled .property-cost-detail-amount { color: var(--warning); }
+.property-valuation-form { display: grid; gap: 11px; padding: 0 0 15px; border-bottom: 1px solid var(--line-strong); }
+.property-valuation-form label { display: grid; gap: 5px; }
+.property-valuation-form label > span { color: var(--text); font-size: 12px; font-weight: 750; }
+.property-valuation-form input { min-width: 0; height: 42px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: 10px; color: var(--text); background: var(--panel-soft); font: 700 15px/1 var(--mono); }
+.property-valuation-form label > small { color: var(--muted); font-size: 10px; line-height: 1.45; }
+.property-valuation-form .primary-button { justify-self: start; }
 .capital-recovery-status { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 9px; align-items: baseline; padding: 10px 14px; border-top: 1px solid var(--line); background: rgba(136, 255, 86, 0.025); }
 .capital-recovery-status span { color: var(--muted); font: 650 9px/1 var(--mono); letter-spacing: 0.08em; }
 .capital-recovery-status strong { color: var(--text); font-size: 12px; }

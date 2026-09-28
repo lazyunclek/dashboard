@@ -657,15 +657,19 @@ function buildDashboard(raw) {
     propertyRecoveryRoomTwd -= amount;
   }
   const propertyModel = propertyComponent?.metadata?.valuation_model || null;
-  const propertySalePriceTwd = num(propertyModel?.estimated_sale_value_twd ?? propertyModel?.future_sale_total_twd);
+  const propertyAssumption = (raw.propertyValuationAssumptions || []).find((row) => row.property_component_id === propertyComponent?.id) || null;
+  const propertySalePriceTwd = num(propertyAssumption?.estimated_sale_value_twd ?? propertyModel?.estimated_sale_value_twd ?? propertyModel?.future_sale_total_twd);
   const propertyPurchasePriceTwd = num(propertyModel?.purchase_total_twd);
-  const propertyTaxRate = num(propertyModel?.sale_tax_rate ?? (1 - num(propertyModel?.sale_profit_retention_rate ?? 0.55)));
+  const propertyRetentionRate = num(propertyAssumption?.profit_retention_rate ?? propertyModel?.profit_retention_rate ?? propertyModel?.sale_profit_retention_rate);
+  const propertyTaxRate = num(propertyModel?.sale_tax_rate ?? (1 - propertyRetentionRate));
   const propertyEstimatedTaxTwd = Math.max(propertySalePriceTwd - propertyPurchasePriceTwd, 0) * propertyTaxRate;
   // The current property valuation summary persists the retained gain directly.
   // Prefer it over the legacy sale-price formula: newer summaries use
   // `estimated_sale_value_twd` rather than `future_sale_total_twd`, so applying
   // the old formula would incorrectly treat the sale value as zero.
-  const retainedGain = propertyModel?.estimated_retained_gain_twd ?? propertyModel?.estimated_after_sale_profit_twd;
+  const retainedGain = propertyAssumption
+    ? (propertySalePriceTwd - propertyPurchasePriceTwd) * propertyRetentionRate
+    : propertyModel?.estimated_retained_gain_twd ?? propertyModel?.estimated_after_sale_profit_twd;
   const propertyEstimatedProfitTwd = retainedGain !== null && retainedGain !== undefined
     ? num(retainedGain)
     : propertyModel
@@ -676,10 +680,13 @@ function buildDashboard(raw) {
     : 0;
   const propertyValuation = {
     available: Boolean(propertyComponent),
+    assumptionId: propertyAssumption?.id || null,
     estimatedSaleValueTwd: propertySalePriceTwd,
     purchasePriceTwd: propertyPurchasePriceTwd,
-    rawMarketGainTwd: num(propertyModel?.raw_market_gain_twd ?? (propertySalePriceTwd - propertyPurchasePriceTwd)),
-    retentionRate: num(propertyModel?.profit_retention_rate ?? propertyModel?.sale_profit_retention_rate),
+    rawMarketGainTwd: propertyAssumption
+      ? propertySalePriceTwd - propertyPurchasePriceTwd
+      : num(propertyModel?.raw_market_gain_twd ?? (propertySalePriceTwd - propertyPurchasePriceTwd)),
+    retentionRate: propertyRetentionRate,
     retainedGainTwd: propertyEstimatedProfitTwd,
     recoverableCapitalTwd: propertyRecoverableTwd,
     nonRecoverableCostTwd: propertyNonRecoverableTwd,
@@ -796,7 +803,7 @@ async function loadDashboard() {
     const portfolioId = portfolios[0]?.id;
     if (!portfolioId) throw new Error("這個帳號沒有可用的投資組合");
     const filter = `portfolio_id=eq.${encodeURIComponent(portfolioId)}`;
-    const [assets, transactions, incomeEvents, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents, capitalRecoveryRows] = await Promise.all([
+    const [assets, transactions, incomeEvents, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents, propertyValuationAssumptions, capitalRecoveryRows] = await Promise.all([
       fetchAll(`investment_assets?select=id,portfolio_id,symbol,name,asset_class,market,quote_currency,quantity_unit,quantity_scale,price_scale,amount_scale,metadata&${filter}&order=symbol.asc`),
       fetchAll(`investment_transactions?select=id,portfolio_id,account_id,asset_id,transaction_type,trade_date,quantity,unit_price,gross_amount,fee_amount,tax_amount,net_cash_amount,settlement_currency,source_row_id,status,details,created_at,updated_at&status=neq.voided&${filter}&order=trade_date.desc,created_at.desc`),
       fetchAll(`investment_income_events?select=id,portfolio_id,account_id,asset_id,income_type,event_date,gross_amount,withholding_tax,fee_amount,net_amount,currency,status,details,created_at,updated_at&status=neq.voided&${filter}&order=event_date.desc,created_at.desc`),
@@ -805,10 +812,11 @@ async function loadDashboard() {
       fetchAll("cashbook_account_balances?select=account_id,account_type,currency,asset_class,balance,status,use_as_investment_usd_source"),
       fetchAll("cashbook_events?select=id,event_type,original_amount,original_currency,destination_account_id,destination_amount,twd_value,source_payload,status"),
       fetchAll(`investment_property_events?select=property_component_id,amount_twd,recovery_class&${filter}`),
+      fetchAll(`investment_property_valuation_assumptions?select=id,property_component_id,estimated_sale_value_twd,profit_retention_rate&${filter}`),
       investmentReadRpc("investment_capital_recovery_summary")
     ]);
     const marketPrices = await fetchLatestMarketPrices(assets, portfolioId);
-    state.data = buildDashboard({ portfolios, assets, transactions, incomeEvents, marketPrices, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents, capitalRecoveryRows });
+    state.data = buildDashboard({ portfolios, assets, transactions, incomeEvents, marketPrices, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents, propertyValuationAssumptions, capitalRecoveryRows });
     renderDashboard();
   } catch (error) {
     byId("error-message").textContent = error instanceof Error ? error.message : String(error);
@@ -2003,10 +2011,38 @@ function renderOverview() {
 function openPropertyValuation() {
   const valuation = state.data?.propertyValuation;
   if (!valuation?.available) return;
-  const rate = valuation.retentionRate > 0 ? `${(valuation.retentionRate * 100).toFixed(0)}%` : "尚未設定";
+  const rate = `${(valuation.retentionRate * 100).toFixed(1)}%`;
   byId("property-valuation-summary").innerHTML = `<div class="property-cost-total"><span>目前納入總資產的房地產價值</span><strong class="private-number">${overviewMoney(valuation.propertyValueTwd)}</strong><small>可回收本金 ＋ 預估保留收益；估值假設變動時，這個數字會隨之更新。</small></div><div><span>可回收本金</span><strong class="private-number">${overviewMoney(valuation.recoverableCapitalTwd)}</strong></div><div><span>預估保留收益</span><strong class="private-number">${overviewMoney(valuation.retainedGainTwd)}</strong></div>`;
-  byId("property-valuation-list").innerHTML = `<article class="property-cost-detail-row"><span><strong>預估售價</strong><small>可隨市場判斷調整的模型假設</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.estimatedSaleValueTwd)}</b></article><article class="property-cost-detail-row"><span><strong>買入總價</strong><small>估值模型的買入基準</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.purchasePriceTwd)}</b></article><article class="property-cost-detail-row"><span><strong>預估價差</strong><small>預估售價 − 買入總價</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.rawMarketGainTwd, true)}</b></article><article class="property-cost-detail-row"><span><strong>收益保留率</strong><small>價差中納入資產價值的比例</small></span><b class="property-cost-detail-amount">${rate}</b></article><article class="property-cost-detail-row"><span><strong>計算式</strong><small>${overviewMoney(valuation.recoverableCapitalTwd)} ＋ ${overviewMoney(valuation.rawMarketGainTwd)} × ${rate}</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.propertyValueTwd)}</b></article>`;
+  byId("property-valuation-list").innerHTML = `<form class="property-valuation-form" id="property-valuation-form"><label><span>預估售價（TWD）</span><input id="property-valuation-sale-price" type="number" min="0" step="1" inputmode="decimal" value="${valuation.estimatedSaleValueTwd}"><small>市場判斷變動時，在這裡更新。</small></label><label><span>收益保留率（%）</span><input id="property-valuation-retention-rate" type="number" min="0" max="100" step="0.1" inputmode="decimal" value="${(valuation.retentionRate * 100).toFixed(1)}"><small>預估價差中納入資產價值的比例。</small></label><p class="form-status" id="property-valuation-status"></p><button class="primary-button" type="submit">儲存估值假設</button></form><article class="property-cost-detail-row"><span><strong>買入總價</strong><small>估值模型的買入基準</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.purchasePriceTwd)}</b></article><article class="property-cost-detail-row"><span><strong>目前預估價差</strong><small>預估售價 − 買入總價</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.rawMarketGainTwd, true)}</b></article><article class="property-cost-detail-row"><span><strong>目前計算式</strong><small>${overviewMoney(valuation.recoverableCapitalTwd)} ＋ ${overviewMoney(valuation.rawMarketGainTwd)} × ${rate}</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.propertyValueTwd)}</b></article>`;
+  byId("property-valuation-form").addEventListener("submit", savePropertyValuation);
   openSheet("property-valuation-sheet");
+}
+
+async function savePropertyValuation(event) {
+  event.preventDefault();
+  const valuation = state.data?.propertyValuation;
+  const status = byId("property-valuation-status");
+  const salePriceTwd = num(byId("property-valuation-sale-price").value);
+  const retentionRate = num(byId("property-valuation-retention-rate").value) / 100;
+  if (!valuation?.assumptionId) { status.textContent = "找不到可更新的房地產估值假設"; return; }
+  if (!(salePriceTwd > 0)) { status.textContent = "請輸入大於 0 的預估售價"; return; }
+  if (!(retentionRate >= 0 && retentionRate <= 1)) { status.textContent = "收益保留率請填 0 到 100"; return; }
+  const submit = event.currentTarget.querySelector("button[type=submit]");
+  submit.disabled = true;
+  status.textContent = "儲存並重新計算中…";
+  try {
+    await rest(`investment_property_valuation_assumptions?id=eq.${encodeURIComponent(valuation.assumptionId)}&select=id`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({ estimated_sale_value_twd: salePriceTwd, profit_retention_rate: retentionRate })
+    });
+    closeSheet("property-valuation-sheet");
+    await loadDashboard();
+    showToast("房地產估值假設已更新");
+  } catch (error) {
+    submit.disabled = false;
+    status.textContent = error instanceof Error ? `儲存失敗：${error.message}` : "儲存失敗";
+  }
 }
 
 const exposurePalette = ["#9cff57", "#54d6a8", "#55a7ff", "#b58cff", "#f0c66c", "#ff8a8a", "#70d6ff", "#a7b28d", "#d7ff8c", "#7e8bff"];
