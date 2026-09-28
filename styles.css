@@ -231,6 +231,8 @@ input::placeholder { color: #53645a; }
 .metric-card small { display: block; margin-top: 7px; color: var(--muted); font-size: 10px; line-height: 1.4; }
 .overview-metric-grid .metric-card:not(.metric-card-wide) > strong { overflow: hidden; font-size: clamp(12px, 3.45vw, 15px); letter-spacing: -0.035em; text-overflow: clip; white-space: nowrap; }
 .overview-metric-grid .metric-card:not(.metric-card-wide) > small { font-size: 8.5px; }
+.metric-detail-button { min-height: 26px; margin-top: 10px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--accent); background: transparent; font-size: 9px; font-weight: 750; cursor: pointer; }
+.metric-detail-button:active { background: var(--accent-soft); }
 .metric-card-wide { grid-column: 1 / -1; }
 .fx-metric-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: end; }
 .fx-metric-card > span { grid-column: 1 / -1; }

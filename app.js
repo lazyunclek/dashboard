@@ -657,7 +657,7 @@ function buildDashboard(raw) {
     propertyRecoveryRoomTwd -= amount;
   }
   const propertyModel = propertyComponent?.metadata?.valuation_model || null;
-  const propertySalePriceTwd = num(propertyModel?.future_sale_total_twd);
+  const propertySalePriceTwd = num(propertyModel?.estimated_sale_value_twd ?? propertyModel?.future_sale_total_twd);
   const propertyPurchasePriceTwd = num(propertyModel?.purchase_total_twd);
   const propertyTaxRate = num(propertyModel?.sale_tax_rate ?? (1 - num(propertyModel?.sale_profit_retention_rate ?? 0.55)));
   const propertyEstimatedTaxTwd = Math.max(propertySalePriceTwd - propertyPurchasePriceTwd, 0) * propertyTaxRate;
@@ -674,6 +674,17 @@ function buildDashboard(raw) {
   const propertyValueTwd = propertyComponent
     ? propertyRecoverableTwd + propertyEstimatedProfitTwd
     : 0;
+  const propertyValuation = {
+    available: Boolean(propertyComponent),
+    estimatedSaleValueTwd: propertySalePriceTwd,
+    purchasePriceTwd: propertyPurchasePriceTwd,
+    rawMarketGainTwd: num(propertyModel?.raw_market_gain_twd ?? (propertySalePriceTwd - propertyPurchasePriceTwd)),
+    retentionRate: num(propertyModel?.profit_retention_rate ?? propertyModel?.sale_profit_retention_rate),
+    retainedGainTwd: propertyEstimatedProfitTwd,
+    recoverableCapitalTwd: propertyRecoverableTwd,
+    nonRecoverableCostTwd: propertyNonRecoverableTwd,
+    propertyValueTwd
+  };
 
   const runningGrids = gridRecords.filter((row) => row.record_state === "running");
   const closedGrids = gridRecords.filter((row) => row.record_state === "closed");
@@ -761,6 +772,7 @@ function buildDashboard(raw) {
     financialCostTwd,
     totalAssetsTwd,
     propertyValueTwd,
+    propertyValuation,
     unrealizedPnlTwd,
     unrealizedPnlPct: financialCostTwd > 0 ? unrealizedPnlTwd / financialCostTwd * 100 : null,
     realizedPnlTwd,
@@ -1628,7 +1640,7 @@ function openSheet(id) {
 
 function closeSheet(id) {
   byId(id).hidden = true;
-  const allSheetsClosed = byId("cashbook-sheet").hidden && byId("cashbook-schedule-sheet").hidden && byId("cashbook-account-sheet").hidden && byId("property-cost-details-sheet").hidden && byId("cashbook-availability-sheet").hidden && byId("capital-recovery-sheet").hidden;
+  const allSheetsClosed = byId("cashbook-sheet").hidden && byId("cashbook-schedule-sheet").hidden && byId("cashbook-account-sheet").hidden && byId("property-cost-details-sheet").hidden && byId("property-valuation-sheet").hidden && byId("cashbook-availability-sheet").hidden && byId("capital-recovery-sheet").hidden;
   if (!allSheetsClosed) return;
   document.body.classList.remove("sheet-open");
   document.body.style.top = "";
@@ -1958,6 +1970,7 @@ function renderOverview() {
     byId(noteId).textContent = `累積總損益 ${overviewMoney(group?.totalPnlTwd || 0, true)}`;
     setTone(byId(noteId), group?.totalPnlTwd || 0);
   }
+  byId("property-valuation-button").hidden = !data.propertyValuation?.available;
   byId("usd-fx-rate").textContent = `${data.currentFx.toFixed(2)} TWD / USD`;
   byId("usd-fx-note").textContent = `匯兌損益 ${overviewMoney(data.usdFxPnlTwd, true)}`;
   setTone(byId("usd-fx-note"), data.usdFxPnlTwd);
@@ -1985,6 +1998,15 @@ function renderOverview() {
 
   renderExposure();
 
+}
+
+function openPropertyValuation() {
+  const valuation = state.data?.propertyValuation;
+  if (!valuation?.available) return;
+  const rate = valuation.retentionRate > 0 ? `${(valuation.retentionRate * 100).toFixed(0)}%` : "尚未設定";
+  byId("property-valuation-summary").innerHTML = `<div class="property-cost-total"><span>目前納入總資產的房地產價值</span><strong class="private-number">${overviewMoney(valuation.propertyValueTwd)}</strong><small>可回收本金 ＋ 預估保留收益；估值假設變動時，這個數字會隨之更新。</small></div><div><span>可回收本金</span><strong class="private-number">${overviewMoney(valuation.recoverableCapitalTwd)}</strong></div><div><span>預估保留收益</span><strong class="private-number">${overviewMoney(valuation.retainedGainTwd)}</strong></div>`;
+  byId("property-valuation-list").innerHTML = `<article class="property-cost-detail-row"><span><strong>預估售價</strong><small>可隨市場判斷調整的模型假設</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.estimatedSaleValueTwd)}</b></article><article class="property-cost-detail-row"><span><strong>買入總價</strong><small>估值模型的買入基準</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.purchasePriceTwd)}</b></article><article class="property-cost-detail-row"><span><strong>預估價差</strong><small>預估售價 − 買入總價</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.rawMarketGainTwd, true)}</b></article><article class="property-cost-detail-row"><span><strong>收益保留率</strong><small>價差中納入資產價值的比例</small></span><b class="property-cost-detail-amount">${rate}</b></article><article class="property-cost-detail-row"><span><strong>計算式</strong><small>${overviewMoney(valuation.recoverableCapitalTwd)} ＋ ${overviewMoney(valuation.rawMarketGainTwd)} × ${rate}</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.propertyValueTwd)}</b></article>`;
+  openSheet("property-valuation-sheet");
 }
 
 const exposurePalette = ["#9cff57", "#54d6a8", "#55a7ff", "#b58cff", "#f0c66c", "#ff8a8a", "#70d6ff", "#a7b28d", "#d7ff8c", "#7e8bff"];
@@ -2208,6 +2230,7 @@ document.addEventListener("click", (event) => {
   if (scheduleRow) { openScheduleSheet(state.cashbook.schedules.find((row) => row.id === scheduleRow.dataset.cashbookScheduleId) || null); return; }
   const propertyDetailsButton = event.target.closest("[data-property-cost-details-account-id]");
   if (propertyDetailsButton) { void openPropertyCostDetails(propertyDetailsButton.dataset.propertyCostDetailsAccountId); return; }
+  if (event.target.closest("#property-valuation-button")) { openPropertyValuation(); return; }
   const availabilityDetailsButton = event.target.closest("[data-cashbook-availability-account-id]");
   if (availabilityDetailsButton) { openCashbookAvailabilityDetails(availabilityDetailsButton.dataset.cashbookAvailabilityAccountId); return; }
   const capitalRecoveryButton = event.target.closest("[data-capital-recovery-asset-id]");
@@ -2247,6 +2270,8 @@ byId("cashbook-account-close").addEventListener("click", () => closeSheet("cashb
 byId("cashbook-account-sheet").addEventListener("click", (event) => { if (event.target === byId("cashbook-account-sheet")) closeSheet("cashbook-account-sheet"); });
 byId("property-cost-details-close").addEventListener("click", () => closeSheet("property-cost-details-sheet"));
 byId("property-cost-details-sheet").addEventListener("click", (event) => { if (event.target === byId("property-cost-details-sheet")) closeSheet("property-cost-details-sheet"); });
+byId("property-valuation-close").addEventListener("click", () => closeSheet("property-valuation-sheet"));
+byId("property-valuation-sheet").addEventListener("click", (event) => { if (event.target === byId("property-valuation-sheet")) closeSheet("property-valuation-sheet"); });
 byId("cashbook-availability-close").addEventListener("click", () => closeSheet("cashbook-availability-sheet"));
 byId("cashbook-availability-sheet").addEventListener("click", (event) => { if (event.target === byId("cashbook-availability-sheet")) closeSheet("cashbook-availability-sheet"); });
 byId("capital-recovery-close").addEventListener("click", () => closeSheet("capital-recovery-sheet"));

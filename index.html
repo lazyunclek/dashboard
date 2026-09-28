@@ -118,6 +118,7 @@
             <span>房地產</span>
             <strong class="private-value" id="property-assets">—</strong>
             <small class="private-number" id="property-pnl-note">累積總損益 —</small>
+            <button class="metric-detail-button" id="property-valuation-button" type="button" hidden>估值明細</button>
           </article>
           <article class="metric-card metric-card-wide fx-metric-card">
             <span>美元資產匯率</span>
@@ -388,6 +389,13 @@
     <section class="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="property-cost-details-title">
       <header class="sheet-header"><div><p class="eyebrow">PROPERTY COST</p><h2 id="property-cost-details-title">房地產成本細節</h2></div><button id="property-cost-details-close" class="sheet-close-button" type="button">關閉</button></header>
       <div class="property-cost-details"><div id="property-cost-details-summary" class="property-cost-summary"></div><div id="property-cost-details-list" class="property-cost-detail-list"></div></div>
+    </section>
+  </div>
+
+  <div id="property-valuation-sheet" class="sheet-backdrop" hidden>
+    <section class="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="property-valuation-title">
+      <header class="sheet-header"><div><p class="eyebrow">PROPERTY VALUATION</p><h2 id="property-valuation-title">房地產估值明細</h2></div><button id="property-valuation-close" class="sheet-close-button" type="button">關閉</button></header>
+      <div class="property-cost-details"><div id="property-valuation-summary" class="property-cost-summary"></div><div id="property-valuation-list" class="property-cost-detail-list"></div></div>
     </section>
   </div>
 
