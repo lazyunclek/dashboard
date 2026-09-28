@@ -658,7 +658,15 @@ function buildDashboard(raw) {
   }
   const propertyModel = propertyComponent?.metadata?.valuation_model || null;
   const propertyAssumption = (raw.propertyValuationAssumptions || []).find((row) => row.property_component_id === propertyComponent?.id) || null;
-  const propertySalePriceTwd = num(propertyAssumption?.estimated_sale_value_twd ?? propertyModel?.estimated_sale_value_twd ?? propertyModel?.future_sale_total_twd);
+  const propertyValuationInputs = propertyAssumption?.valuation_inputs || propertyModel?.valuation_inputs || {};
+  const propertyUnits = Array.isArray(propertyValuationInputs.units) ? propertyValuationInputs.units : [];
+  const homeUnit = propertyUnits.find((unit) => unit.label === "房屋") || null;
+  const parkingUnit = propertyUnits.find((unit) => unit.label === "車子") || null;
+  const areaPing = num(homeUnit?.quantity) || 25.76;
+  const parkingTotalTwd = num(parkingUnit?.future_sale_price_per_unit_twd) * (num(parkingUnit?.quantity) || 1);
+  const storedSalePriceTwd = num(propertyAssumption?.estimated_sale_value_twd ?? propertyModel?.estimated_sale_value_twd ?? propertyModel?.future_sale_total_twd);
+  const estimatedPricePerPingTwd = num(homeUnit?.future_sale_price_per_unit_twd) || Math.max((storedSalePriceTwd - parkingTotalTwd) / areaPing, 0);
+  const propertySalePriceTwd = estimatedPricePerPingTwd * areaPing + parkingTotalTwd;
   const propertyPurchasePriceTwd = num(propertyModel?.purchase_total_twd);
   const propertyRetentionRate = num(propertyAssumption?.profit_retention_rate ?? propertyModel?.profit_retention_rate ?? propertyModel?.sale_profit_retention_rate);
   const propertyTaxRate = num(propertyModel?.sale_tax_rate ?? (1 - propertyRetentionRate));
@@ -682,6 +690,10 @@ function buildDashboard(raw) {
     available: Boolean(propertyComponent),
     assumptionId: propertyAssumption?.id || null,
     estimatedSaleValueTwd: propertySalePriceTwd,
+    areaPing,
+    estimatedPricePerPingTwd,
+    parkingTotalTwd,
+    valuationInputs: propertyValuationInputs,
     purchasePriceTwd: propertyPurchasePriceTwd,
     rawMarketGainTwd: propertyAssumption
       ? propertySalePriceTwd - propertyPurchasePriceTwd
@@ -812,7 +824,7 @@ async function loadDashboard() {
       fetchAll("cashbook_account_balances?select=account_id,account_type,currency,asset_class,balance,status,use_as_investment_usd_source"),
       fetchAll("cashbook_events?select=id,event_type,original_amount,original_currency,destination_account_id,destination_amount,twd_value,source_payload,status"),
       fetchAll(`investment_property_events?select=property_component_id,amount_twd,recovery_class&${filter}`),
-      fetchAll(`investment_property_valuation_assumptions?select=id,property_component_id,estimated_sale_value_twd,profit_retention_rate&${filter}`),
+      fetchAll(`investment_property_valuation_assumptions?select=id,property_component_id,estimated_sale_value_twd,profit_retention_rate,valuation_inputs&${filter}`),
       investmentReadRpc("investment_capital_recovery_summary")
     ]);
     const marketPrices = await fetchLatestMarketPrices(assets, portfolioId);
@@ -2013,19 +2025,29 @@ function openPropertyValuation() {
   if (!valuation?.available) return;
   const rate = `${(valuation.retentionRate * 100).toFixed(1)}%`;
   byId("property-valuation-summary").innerHTML = `<div class="property-cost-total"><span>目前納入總資產的房地產價值</span><strong class="private-number">${overviewMoney(valuation.propertyValueTwd)}</strong><small>可回收本金 ＋ 預估保留收益；估值假設變動時，這個數字會隨之更新。</small></div><div><span>可回收本金</span><strong class="private-number">${overviewMoney(valuation.recoverableCapitalTwd)}</strong></div><div><span>預估保留收益</span><strong class="private-number">${overviewMoney(valuation.retainedGainTwd)}</strong></div>`;
-  byId("property-valuation-list").innerHTML = `<form class="property-valuation-form" id="property-valuation-form"><label><span>預估售價（TWD）</span><input id="property-valuation-sale-price" type="number" min="0" step="1" inputmode="decimal" value="${valuation.estimatedSaleValueTwd}"><small>市場判斷變動時，在這裡更新。</small></label><label><span>收益保留率（%）</span><input id="property-valuation-retention-rate" type="number" min="0" max="100" step="0.1" inputmode="decimal" value="${(valuation.retentionRate * 100).toFixed(1)}"><small>預估價差中納入資產價值的比例。</small></label><p class="form-status" id="property-valuation-status"></p><button class="primary-button" type="submit">儲存估值假設</button></form><article class="property-cost-detail-row"><span><strong>買入總價</strong><small>估值模型的買入基準</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.purchasePriceTwd)}</b></article><article class="property-cost-detail-row"><span><strong>目前預估價差</strong><small>預估售價 − 買入總價</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.rawMarketGainTwd, true)}</b></article><article class="property-cost-detail-row"><span><strong>目前計算式</strong><small>${overviewMoney(valuation.recoverableCapitalTwd)} ＋ ${overviewMoney(valuation.rawMarketGainTwd)} × ${rate}</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.propertyValueTwd)}</b></article>`;
+  byId("property-valuation-list").innerHTML = `<form class="property-valuation-form" id="property-valuation-form"><label><span>預估單價（每坪／TWD）</span><input id="property-valuation-price-per-ping" type="number" min="0" step="1" inputmode="decimal" value="${valuation.estimatedPricePerPingTwd}"><small>以 ${valuation.areaPing} 坪計算房屋預估售價。</small></label><label><span>車位總價（TWD）</span><input id="property-valuation-parking-total" type="number" min="0" step="1" inputmode="decimal" value="${valuation.parkingTotalTwd}"><small>不再手填預估總價。</small></label><output class="property-valuation-preview" id="property-valuation-total-preview">預估總價 ${overviewMoney(valuation.estimatedSaleValueTwd)} ＝ ${overviewMoney(valuation.estimatedPricePerPingTwd)} × ${valuation.areaPing} 坪 ＋ ${overviewMoney(valuation.parkingTotalTwd)}</output><label><span>收益保留率（%）</span><input id="property-valuation-retention-rate" type="number" min="0" max="100" step="0.1" inputmode="decimal" value="${(valuation.retentionRate * 100).toFixed(1)}"><small>預估價差中納入資產價值的比例。</small></label><p class="form-status" id="property-valuation-status"></p><button class="primary-button" type="submit">儲存估值假設</button></form><article class="property-cost-detail-row"><span><strong>買入總價</strong><small>估值模型的買入基準</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.purchasePriceTwd)}</b></article><article class="property-cost-detail-row"><span><strong>目前預估價差</strong><small>預估總價 − 買入總價</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.rawMarketGainTwd, true)}</b></article><article class="property-cost-detail-row"><span><strong>目前計算式</strong><small>${overviewMoney(valuation.recoverableCapitalTwd)} ＋ ${overviewMoney(valuation.rawMarketGainTwd)} × ${rate}</small></span><b class="property-cost-detail-amount private-number">${overviewMoney(valuation.propertyValueTwd)}</b></article>`;
   byId("property-valuation-form").addEventListener("submit", savePropertyValuation);
+  for (const id of ["property-valuation-price-per-ping", "property-valuation-parking-total"]) byId(id).addEventListener("input", () => renderPropertyValuationTotalPreview(valuation.areaPing));
   openSheet("property-valuation-sheet");
+}
+
+function renderPropertyValuationTotalPreview(areaPing) {
+  const pricePerPingTwd = num(byId("property-valuation-price-per-ping").value);
+  const parkingTotalTwd = num(byId("property-valuation-parking-total").value);
+  const totalTwd = pricePerPingTwd * areaPing + parkingTotalTwd;
+  byId("property-valuation-total-preview").textContent = `預估總價 ${overviewMoney(totalTwd)} ＝ ${overviewMoney(pricePerPingTwd)} × ${areaPing} 坪 ＋ ${overviewMoney(parkingTotalTwd)}`;
 }
 
 async function savePropertyValuation(event) {
   event.preventDefault();
   const valuation = state.data?.propertyValuation;
   const status = byId("property-valuation-status");
-  const salePriceTwd = num(byId("property-valuation-sale-price").value);
+  const pricePerPingTwd = num(byId("property-valuation-price-per-ping").value);
+  const parkingTotalTwd = num(byId("property-valuation-parking-total").value);
+  const salePriceTwd = pricePerPingTwd * valuation.areaPing + parkingTotalTwd;
   const retentionRate = num(byId("property-valuation-retention-rate").value) / 100;
   if (!valuation?.assumptionId) { status.textContent = "找不到可更新的房地產估值假設"; return; }
-  if (!(salePriceTwd > 0)) { status.textContent = "請輸入大於 0 的預估售價"; return; }
+  if (!(pricePerPingTwd > 0) || !(parkingTotalTwd >= 0)) { status.textContent = "請輸入大於 0 的預估單價與非負的車位總價"; return; }
   if (!(retentionRate >= 0 && retentionRate <= 1)) { status.textContent = "收益保留率請填 0 到 100"; return; }
   const submit = event.currentTarget.querySelector("button[type=submit]");
   submit.disabled = true;
@@ -2034,7 +2056,7 @@ async function savePropertyValuation(event) {
     await rest(`investment_property_valuation_assumptions?id=eq.${encodeURIComponent(valuation.assumptionId)}&select=id`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Prefer: "return=representation" },
-      body: JSON.stringify({ estimated_sale_value_twd: salePriceTwd, profit_retention_rate: retentionRate })
+      body: JSON.stringify({ estimated_sale_value_twd: salePriceTwd, profit_retention_rate: retentionRate, valuation_inputs: { ...valuation.valuationInputs, units: propertyValuationUnits(valuation, pricePerPingTwd, parkingTotalTwd) } })
     });
     closeSheet("property-valuation-sheet");
     await loadDashboard();
@@ -2043,6 +2065,17 @@ async function savePropertyValuation(event) {
     submit.disabled = false;
     status.textContent = error instanceof Error ? `儲存失敗：${error.message}` : "儲存失敗";
   }
+}
+
+function propertyValuationUnits(valuation, pricePerPingTwd, parkingTotalTwd) {
+  const units = Array.isArray(valuation.valuationInputs?.units) ? valuation.valuationInputs.units.map((unit) => ({ ...unit })) : [];
+  const home = units.find((unit) => unit.label === "房屋");
+  const parking = units.find((unit) => unit.label === "車子");
+  if (home) { home.quantity = valuation.areaPing; home.future_sale_price_per_unit_twd = pricePerPingTwd; }
+  else units.push({ label: "房屋", quantity: valuation.areaPing, future_sale_price_per_unit_twd: pricePerPingTwd });
+  if (parking) { parking.quantity = 1; parking.future_sale_price_per_unit_twd = parkingTotalTwd; }
+  else units.push({ label: "車子", quantity: 1, future_sale_price_per_unit_twd: parkingTotalTwd });
+  return units;
 }
 
 const exposurePalette = ["#9cff57", "#54d6a8", "#55a7ff", "#b58cff", "#f0c66c", "#ff8a8a", "#70d6ff", "#a7b28d", "#d7ff8c", "#7e8bff"];

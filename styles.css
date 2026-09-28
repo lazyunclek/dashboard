@@ -475,6 +475,7 @@ button.cashbook-account-row { cursor: pointer; }
 .property-valuation-form label > span { color: var(--text); font-size: 12px; font-weight: 750; }
 .property-valuation-form input { min-width: 0; height: 42px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: 10px; color: var(--text); background: var(--panel-soft); font: 700 15px/1 var(--mono); }
 .property-valuation-form label > small { color: var(--muted); font-size: 10px; line-height: 1.45; }
+.property-valuation-preview { display: block; padding: 10px 11px; border: 1px solid var(--line); border-radius: 10px; color: var(--accent); background: var(--accent-soft); font: 700 11px/1.5 var(--mono); }
 .property-valuation-form .primary-button { justify-self: start; }
 .capital-recovery-status { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 9px; align-items: baseline; padding: 10px 14px; border-top: 1px solid var(--line); background: rgba(136, 255, 86, 0.025); }
 .capital-recovery-status span { color: var(--muted); font: 650 9px/1 var(--mono); letter-spacing: 0.08em; }
