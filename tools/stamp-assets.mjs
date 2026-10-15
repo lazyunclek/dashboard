@@ -16,5 +16,6 @@ await fs.writeFile(indexPath, html);
 const appPath = path.join(root, "app.js");
 let app = await fs.readFile(appPath, "utf8");
 app = app.replace(/\.\/capital-recovery\.mjs(?:\?v=[^"']+)?/g, `./capital-recovery.mjs?v=${version}`);
+app = app.replace(/\.\/position-heatmap\.mjs(?:\?v=[^"']+)?/g, `./position-heatmap.mjs?v=${version}`);
 await fs.writeFile(appPath, app);
 console.log(`Stamped static assets with ${version}`);

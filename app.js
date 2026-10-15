@@ -1,4 +1,5 @@
 import { scheduledCashProjection } from "./credit-card-reserves.mjs";
+import { dayMove, heatmapData, treemapRects } from "./position-heatmap.mjs";
 
 const config = window.__INVESTMENT_DASHBOARD_CONFIG__;
 
@@ -22,6 +23,8 @@ const state = {
   data: null,
   activeTab: "cashbook",
   marketFilter: "all",
+  heatmapMetric: "day",
+  selectedHeatmapId: "",
   positionStatus: "open",
   positionCurrency: "TWD",
   positionExpandedIds: new Set(),
@@ -179,7 +182,7 @@ async function fetchAll(path, pageSize = 1000) {
 }
 
 async function fetchLatestMarketPrices(assets, portfolioId) {
-  const select = "select=id,portfolio_id,asset_id,instrument_key,quote_currency,price,price_at,fetched_at,source,status";
+  const select = "select=id,portfolio_id,asset_id,instrument_key,quote_currency,price,price_at,fetched_at,source,status,source_payload";
   const filter = `portfolio_id=eq.${encodeURIComponent(portfolioId)}&status=eq.success`;
   const requests = assets.map((asset) => rest(`investment_market_prices?${select}&${filter}&asset_id=eq.${encodeURIComponent(asset.id)}&order=fetched_at.desc&limit=1`));
   requests.push(rest(`investment_market_prices?${select}&${filter}&instrument_key=eq.${encodeURIComponent("USD/TWD")}&order=fetched_at.desc&limit=1`));
@@ -427,6 +430,8 @@ function buildDashboard(raw) {
   }
   const fxRow = latestPrices.get("USD/TWD");
   const currentFx = num(fxRow?.price) || 1;
+  const fxAgeMs = Date.now() - new Date(fxRow?.fetched_at || 0).getTime();
+  const heatmapFxTwd = Number(fxRow?.price) > 0 && fxAgeMs >= 0 && fxAgeMs <= 26 * 60 * 60 * 1000 ? currentFx : null;
   const toUsd = (value) => value === null || value === undefined ? null : num(value) / currentFx;
 
   const fundingAssets = assets.filter((asset) => asset.metadata?.funding_pool || ["USD", "USDC", "USDT"].includes(String(asset.symbol).toUpperCase()));
@@ -503,6 +508,11 @@ function buildDashboard(raw) {
       marketPriceAt: price?.price_at || price?.fetched_at || null,
       marketPriceFetchedAt: price?.fetched_at || null,
       marketPriceStatus: price ? quoteFreshness(asset.asset_class, price.fetched_at) : "missing",
+      marketPriceSource: price?.source || null,
+      dayBaselinePrice: price?.source_payload?.day_baseline_price ?? null,
+      dayBaselineAt: price?.source_payload?.day_baseline_at ?? null,
+      dayBaselineKind: price?.source_payload?.day_baseline_kind ?? null,
+      currentFx: heatmapFxTwd,
       marketValueNative,
       marketValueTwd,
       marketValueUsd: toUsd(marketValueTwd),
@@ -544,6 +554,12 @@ function buildDashboard(raw) {
       : num(component.net_value_twd ?? component.gross_value_twd);
     const canonical = canonicalPositions.get(spotPositionKey(symbol));
     if (canonical) {
+      if (price && canonical.marketPrice === null) {
+        canonical.marketPriceSource = price.source || null;
+        canonical.dayBaselinePrice = price.source_payload?.day_baseline_price ?? null;
+        canonical.dayBaselineAt = price.source_payload?.day_baseline_at ?? null;
+        canonical.dayBaselineKind = price.source_payload?.day_baseline_kind ?? null;
+      }
       if (canonical.marketPrice === null && component.latest_price !== null) {
         canonical.marketPrice = num(component.latest_price);
         canonical.marketPriceCurrency = component.native_currency;
@@ -589,6 +605,11 @@ function buildDashboard(raw) {
       marketPriceAt: price?.price_at || price?.fetched_at || component.source_updated_at,
       marketPriceFetchedAt: price?.fetched_at || component.source_updated_at,
       marketPriceStatus: price ? quoteFreshness(component.asset_class, price.fetched_at) : "stale",
+      marketPriceSource: price?.source || null,
+      dayBaselinePrice: price?.source_payload?.day_baseline_price ?? null,
+      dayBaselineAt: price?.source_payload?.day_baseline_at ?? null,
+      dayBaselineKind: price?.source_payload?.day_baseline_kind ?? null,
+      currentFx: heatmapFxTwd,
       marketValueNative: null,
       marketValueTwd: currentValue,
       marketValueUsd: toUsd(currentValue),
@@ -1896,7 +1917,97 @@ async function voidCashbookEvent() {
   }
 }
 
+function heatmapPercent(value) {
+  return `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toFixed(2)}%`;
+}
+
+function renderHeatmapDetail(tiles, total) {
+  const row = tiles.find((item) => item.id === state.selectedHeatmapId);
+  document.querySelectorAll("[data-heatmap-asset]").forEach((button) => button.classList.toggle("is-selected", button.dataset.heatmapAsset === state.selectedHeatmapId));
+  const detail = byId("heatmap-detail");
+  if (!row) {
+    detail.innerHTML = "<span>點選方塊查看該持倉的漲跌與比例。</span>";
+    return;
+  }
+  const move = dayMove(row);
+  const dayLabel = row.assetClass === "crypto" ? "近 24 小時" : "最近交易日";
+  const dayUnavailable = row.marketPriceStatus === "stale" ? "行情過期" : "缺少比較基準";
+  const weight = total > 0 ? Number(row.marketValueTwd) / total * 100 : 0;
+  detail.innerHTML = `
+    <div class="heatmap-detail-title"><strong>${escapeHtml(row.displaySymbol || row.symbol)} · ${escapeHtml(row.name || "")}</strong><small>${escapeHtml(row.primarySector || "其他／待分類")}</small></div>
+    <div class="heatmap-detail-grid">
+      <span><small>篩選持倉占比</small><b class="private-number">${weight.toFixed(1)}%</b></span>
+      <span><small>目前市值</small><b class="private-number">${money(row.marketValueTwd)}</b></span>
+      <span><small>累積總損益</small><b class="private-number">${money(row.totalPnlTwd, "TWD", true)}</b></span>
+      <span><small>${dayLabel}漲跌</small><b class="private-number">${move ? heatmapPercent(move.percent) : "—"}</b></span>
+      <span><small>持倉價格影響估算</small><b class="private-number">${move ? money(move.amountTwd, "TWD", true) : "—"}</b></span>
+    </div>
+    <p>${move ? "用目前持有數量及目前匯率估算，不含當日交易與匯率變動。" : dayUnavailable} 行情時間 ${dateTime(row.marketPriceAt)}${row.marketPriceSource ? ` · ${escapeHtml(row.marketPriceSource)}` : ""}</p>`;
+}
+
+function renderHeatmap() {
+  const view = heatmapData(state.data.positions, state.marketFilter);
+  const shares = byId("heatmap-market-shares");
+  shares.replaceChildren();
+  for (const [market, label] of [["tw_equity", "台股"], ["us_equity", "美股"], ["crypto", "加密"]]) {
+    const share = document.createElement("span");
+    share.innerHTML = `<small>${label}</small><b class="private-number">${view.marketTotal > 0 ? (view.marketTotals[market] / view.marketTotal * 100).toFixed(1) : "0.0"}%</b>`;
+    shares.append(share);
+  }
+  document.querySelectorAll("[data-heatmap-metric]").forEach((button) => button.classList.toggle("is-active", button.dataset.heatmapMetric === state.heatmapMetric));
+  const canvas = byId("heatmap-canvas");
+  canvas.replaceChildren();
+  const smallList = byId("heatmap-small-list");
+  smallList.replaceChildren();
+  canvas.classList.toggle("is-empty", !view.tiles.length);
+  if (!view.tiles.length) canvas.textContent = "目前沒有可估值的現有持倉";
+  else {
+    const rects = treemapRects(view.tiles);
+    for (const row of view.tiles) {
+      const rect = rects.get(row.id);
+      const move = dayMove(row);
+      const value = state.heatmapMetric === "day" ? move?.percent ?? null : Number(row.totalPnlTwd);
+      const tone = value === null || !Number.isFinite(value) ? "is-unavailable" : value > 0 ? "is-up" : value < 0 ? "is-down" : "is-flat";
+      const label = state.heatmapMetric === "day" ? value === null ? "—" : heatmapPercent(value) : money(value, "TWD", true);
+      const tile = document.createElement("button");
+      tile.type = "button";
+      tile.className = `heatmap-tile ${tone}${rect.width < 0.12 || rect.height < 0.13 ? " is-small" : ""}${rect.width < 0.06 || rect.height < 0.07 ? " is-micro" : ""}`;
+      tile.dataset.heatmapAsset = row.id;
+      tile.style.left = `${rect.x * 100}%`;
+      tile.style.top = `${rect.y * 100}%`;
+      tile.style.width = `${rect.width * 100}%`;
+      tile.style.height = `${rect.height * 100}%`;
+      tile.setAttribute("aria-label", `${row.displaySymbol || row.symbol}，${state.heatmapMetric === "day" ? "單天漲跌" : "總損益"}${label}，點選查看明細`);
+      tile.innerHTML = `<span class="heatmap-tile-inner"><strong>${escapeHtml(row.displaySymbol || row.symbol)}</strong><small class="private-number">${escapeHtml(label)}</small></span>`;
+      canvas.append(tile);
+      if (tile.classList.contains("is-micro")) {
+        const small = document.createElement("button");
+        small.type = "button";
+        small.dataset.heatmapAsset = row.id;
+        small.innerHTML = `<strong>${escapeHtml(row.displaySymbol || row.symbol)}</strong><small class="private-number">${escapeHtml(label)}</small>`;
+        smallList.append(small);
+      }
+    }
+  }
+  smallList.hidden = !smallList.childElementCount;
+  const missing = byId("heatmap-missing-note");
+  missing.hidden = view.missingCount === 0;
+  missing.textContent = view.missingCount ? `${view.missingCount} 檔現有持倉缺少可用市值，未納入方塊與比例。` : "";
+  if (!view.tiles.some((row) => row.id === state.selectedHeatmapId)) state.selectedHeatmapId = "";
+  renderHeatmapDetail(view.tiles, view.total);
+  const sectors = byId("heatmap-sector-list");
+  sectors.replaceChildren();
+  if (!view.sectors.length) sectors.textContent = "目前沒有可分類的持倉市值";
+  for (const sector of view.sectors) {
+    const item = document.createElement("div");
+    item.className = "heatmap-sector-row";
+    item.innerHTML = `<span>${escapeHtml(sector.label)}</span><i><span style="width:${sector.percent}%"></span></i><b class="private-number">${sector.percent.toFixed(1)}%</b>`;
+    sectors.append(item);
+  }
+}
+
 function renderPositions() {
+  renderHeatmap();
   const source = state.positionStatus === "closed" ? state.data.closedPositions : state.data.positions;
   const rows = source.filter((row) => state.marketFilter === "all" || row.assetClass === state.marketFilter);
   byId("position-count").textContent = rows.length;
@@ -2228,6 +2339,21 @@ document.querySelectorAll("#position-filters .filter-chip").forEach((button) => 
   document.querySelectorAll("#position-filters .filter-chip").forEach((chip) => chip.classList.toggle("is-active", chip === button));
   renderPositions();
 }));
+
+document.querySelectorAll("[data-heatmap-metric]").forEach((button) => button.addEventListener("click", () => {
+  state.heatmapMetric = button.dataset.heatmapMetric;
+  renderHeatmap();
+}));
+
+function selectHeatmapAsset(event) {
+  const tile = event.target.closest("[data-heatmap-asset]");
+  if (!tile) return;
+  state.selectedHeatmapId = tile.dataset.heatmapAsset;
+  const view = heatmapData(state.data.positions, state.marketFilter);
+  renderHeatmapDetail(view.tiles, view.total);
+}
+byId("heatmap-canvas").addEventListener("click", selectHeatmapAsset);
+byId("heatmap-small-list").addEventListener("click", selectHeatmapAsset);
 
 document.querySelectorAll("[data-position-status]").forEach((button) => button.addEventListener("click", () => {
   state.positionStatus = button.dataset.positionStatus;

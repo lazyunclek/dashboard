@@ -7,7 +7,7 @@ The public GitHub Pages frontend contains no portfolio snapshot and no privilege
 ## Security boundary
 
 - Investment data remains read-only. The app contains no investment insert, update, delete, or investment RPC write path.
-- Daily cashbook changes use only the allowlisted `cashbook_ensure_defaults`, `cashbook_event_save`, and `cashbook_event_delete` RPCs. Direct browser writes to cashbook tables are not used.
+- Daily cashbook changes use only allowlisted owner-scoped RPCs. In addition to regular entries, the app can manage exact-amount future commitments and normal cash accounts; direct browser writes to cashbook tables are not used.
 - Cashbook reads and RPC writes require a signed-in user and remain constrained by the database's user-owned RLS policies.
 - Never add a Supabase `service_role` or secret key to this repository.
 - The Supabase URL and publishable key in `config.js` are intentionally public browser configuration.
@@ -45,3 +45,7 @@ Push `main`, then configure GitHub Pages to use **GitHub Actions**. The included
 ```bash
 node tools/check-static-app.mjs
 ```
+
+## Engineering handoff
+
+Before changing the frontend, read [`ARCHITECTURE.md`](ARCHITECTURE.md) for the page/data boundary and [`DEVELOPMENT.md`](DEVELOPMENT.md) for local validation, deployment, and configuration safety. For cross-system changes, start at [`../docs/ENGINEERING_DOCS_INDEX.md`](../docs/ENGINEERING_DOCS_INDEX.md) and check [`../docs/CHANGE_IMPACT_MATRIX.md`](../docs/CHANGE_IMPACT_MATRIX.md) before modifying Supabase, Edge Functions, external integrations, or Agent rules.

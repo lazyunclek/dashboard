@@ -4,7 +4,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const required = ["index.html", "styles.css", "app.js", "capital-recovery.mjs", "credit-card-reserves.mjs", "config.js", "manifest.webmanifest", "icon.svg", ".github/workflows/pages.yml", "tools/stamp-assets.mjs", "tools/check-capital-recovery.mjs", "tools/check-credit-card-reserves.mjs"];
+const required = ["index.html", "styles.css", "app.js", "capital-recovery.mjs", "credit-card-reserves.mjs", "position-heatmap.mjs", "config.js", "manifest.webmanifest", "icon.svg", ".github/workflows/pages.yml", "tools/stamp-assets.mjs", "tools/check-capital-recovery.mjs", "tools/check-credit-card-reserves.mjs", "tools/check-position-heatmap.mjs"];
 for (const file of required) await fs.access(path.join(root, file));
 
 const [html, css, app, config, workflow] = await Promise.all([
@@ -15,7 +15,7 @@ const [html, css, app, config, workflow] = await Promise.all([
   fs.readFile(path.join(root, ".github/workflows/pages.yml"), "utf8")
 ]);
 
-for (const token of ["login-view", "dashboard-view", "positions-list", "transaction-search", "transaction-filters", "transaction-list", "current-cash", "running-grid-count", "cashbook-panel", "cashbook-calendar-grid", "cashbook-entry-list", "cashbook-day-expense", "cashbook-week-expense", "cashbook-month-expense", "cashbook-form", "cashbook-scheduled-view", "cashbook-schedule-form", "cashbook-account-form", "cashbook-availability-sheet"]) {
+for (const token of ["login-view", "dashboard-view", "positions-list", "heatmap-canvas", "heatmap-small-list", "heatmap-sector-list", "transaction-search", "transaction-filters", "transaction-list", "current-cash", "running-grid-count", "cashbook-panel", "cashbook-calendar-grid", "cashbook-entry-list", "cashbook-day-expense", "cashbook-week-expense", "cashbook-month-expense", "cashbook-form", "cashbook-scheduled-view", "cashbook-schedule-form", "cashbook-account-form", "cashbook-availability-sheet"]) {
   if (!html.includes(`id="${token}"`)) throw new Error(`Missing HTML target: ${token}`);
 }
 if (html.includes('id="top-positions"') || html.includes("主要持倉")) throw new Error("Overview must not duplicate the positions list");

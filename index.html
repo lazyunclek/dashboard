@@ -193,6 +193,22 @@
           <button class="filter-chip" data-market="us_equity" type="button">美股</button>
           <button class="filter-chip" data-market="crypto" type="button">加密</button>
         </div>
+        <section class="content-card heatmap-card" aria-labelledby="heatmap-title">
+          <div class="section-head heatmap-head">
+            <div><p class="eyebrow">HOLDINGS MAP</p><h3 id="heatmap-title">現有持倉熱力圖</h3></div>
+            <div class="segmented-control" role="group" aria-label="熱力圖漲跌口徑">
+              <button type="button" data-heatmap-metric="total">總損益</button>
+              <button type="button" data-heatmap-metric="day" class="is-active">單天漲跌</button>
+            </div>
+          </div>
+          <p class="exposure-note">方塊面積＝目前台幣市值；上漲綠、下跌紅。單天漲跌為標的價格變化，台美股比較前收盤，加密比較近 24 小時。</p>
+          <div class="heatmap-market-shares" id="heatmap-market-shares"></div>
+          <div class="heatmap-canvas" id="heatmap-canvas" role="group" aria-label="現有持倉方塊熱力圖"></div>
+          <div class="heatmap-small-list" id="heatmap-small-list" aria-label="小面積持倉代號" hidden></div>
+          <p class="exposure-note" id="heatmap-missing-note" hidden></p>
+          <div class="heatmap-detail" id="heatmap-detail" aria-live="polite"></div>
+          <div class="heatmap-sectors"><div class="section-head"><strong>產業占比</strong><small>以目前篩選持倉市值計</small></div><div id="heatmap-sector-list"></div></div>
+        </section>
         <div class="position-status-toggle" role="group" aria-label="持倉狀態">
           <button class="position-status-button is-active" data-position-status="open" type="button">現有持倉</button>
           <button class="position-status-button" data-position-status="closed" type="button">已清倉</button>
