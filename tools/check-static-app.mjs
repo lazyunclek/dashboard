@@ -4,7 +4,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const required = ["index.html", "styles.css", "app.js", "capital-recovery.mjs", "credit-card-reserves.mjs", "position-heatmap.mjs", "config.js", "manifest.webmanifest", "icon.svg", ".github/workflows/pages.yml", "tools/stamp-assets.mjs", "tools/check-capital-recovery.mjs", "tools/check-credit-card-reserves.mjs", "tools/check-position-heatmap.mjs"];
+const required = ["index.html", "styles.css", "app.js", "capital-recovery.mjs", "credit-card-reserves.mjs", "position-heatmap.mjs", "grid-valuation.mjs", "config.js", "manifest.webmanifest", "icon.svg", ".github/workflows/pages.yml", "tools/stamp-assets.mjs", "tools/check-capital-recovery.mjs", "tools/check-credit-card-reserves.mjs", "tools/check-position-heatmap.mjs", "tools/check-grid-valuation.mjs"];
 for (const file of required) await fs.access(path.join(root, file));
 
 const [html, css, app, config, workflow] = await Promise.all([
@@ -55,6 +55,7 @@ for (const token of ["function quoteFreshness", "marketPriceStatus", "行情過�
 if (!html.includes("重新讀取已同步行情")) throw new Error("Mobile refresh control must disclose that it rereads synchronized prices");
 if (!html.includes('id="cost-value-chart"') || !app.includes("function renderCostValueChart(data)") || !css.includes(".cost-value-bar.is-value")) throw new Error("Overview cost/value chart missing");
 if (!html.includes('id="overview-treemap-canvas"') || !app.includes("function renderOverviewTreemap(data)") || !app.includes("overviewTreemapData(data, state.overviewTreemapScope)") || !css.includes(".overview-treemap-tile.is-property")) throw new Error("Overview asset treemap missing");
+if (!app.includes("classifyGridRecords(gridRecords)") || !app.includes("staleGridCount") || !app.includes("不含 ${data.staleGridCount} 組過期網格資料")) throw new Error("Stale grid valuation guard missing");
 for (const token of ["cashValueTwd", "runningGridCount", "runningGridPnlUsd"]) {
   if (!app.includes(token)) throw new Error(`Missing overview capital or strategy signal: ${token}`);
 }

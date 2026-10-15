@@ -1,5 +1,6 @@
 import { scheduledCashProjection } from "./credit-card-reserves.mjs";
 import { dayMove, heatmapData, overviewTreemapData, treemapRects } from "./position-heatmap.mjs";
+import { classifyGridRecords } from "./grid-valuation.mjs";
 
 const config = window.__INVESTMENT_DASHBOARD_CONFIG__;
 
@@ -728,8 +729,7 @@ function buildDashboard(raw) {
     propertyValueTwd
   };
 
-  const runningGrids = gridRecords.filter((row) => row.record_state === "running");
-  const closedGrids = gridRecords.filter((row) => row.record_state === "closed");
+  const { freshRunning: runningGrids, staleRunning: staleGrids, closed: closedGrids } = classifyGridRecords(gridRecords);
   const gridInvestmentUsd = runningGrids.reduce((sum, row) => sum + num(row.investment_usdt), 0);
   const runningGridPnlUsd = runningGrids.reduce((sum, row) => sum + num(row.realized_pnl), 0);
   const gridPnlUsd = [...runningGrids, ...closedGrids].reduce((sum, row) => sum + num(row.realized_pnl), 0);
@@ -806,6 +806,8 @@ function buildDashboard(raw) {
     cashCurrencies,
     runningGridCount: runningGrids.length,
     runningGridPnlUsd,
+    staleGridCount: staleGrids.length,
+    staleGridLastAt: staleGrids.map((row) => row.source_updated_at).filter(Boolean).sort().at(-1) || null,
     currentFx,
     pooledCostFx,
     usdFxPnlTwd,
@@ -2087,10 +2089,10 @@ function renderOverview() {
     ["美股", data.marketUpdates.us_equity],
     ["加密", data.marketUpdates.crypto]
   ].filter(([, value]) => value).map(([label, value]) => `${label} ${dateTime(value)}`);
-  byId("data-updated-at").textContent = `${marketLabels.join(" · ")}${data.stalePriceCount ? ` · ${data.stalePriceCount} 檔過期` : ""}`;
+  byId("data-updated-at").textContent = `${marketLabels.join(" · ")}${data.stalePriceCount ? ` · ${data.stalePriceCount} 檔過期` : ""}${data.staleGridCount ? " · 網格待同步" : ""}`;
   byId("user-email").textContent = state.userEmail || "已登入";
   byId("total-assets").textContent = overviewMoney(data.totalAssetsTwd);
-  byId("total-assets-note").textContent = "四類資產合計";
+  byId("total-assets-note").textContent = data.staleGridCount ? `不含 ${data.staleGridCount} 組過期網格資料；總額待核對` : "四類資產合計";
   const overviewGroups = Object.fromEntries(data.groups.map((group) => [group.key, group]));
   for (const [key, valueId, noteId] of [
     ["traditional", "traditional-assets", "traditional-pnl-note"],
@@ -2112,9 +2114,11 @@ function renderOverview() {
   byId("usd-fx-time").textContent = data.usdFxUpdatedAt ? `行情時間 ${dateTime(data.usdFxUpdatedAt)}` : "行情時間待同步";
   byId("current-cash").textContent = money(data.cashValueTwd);
   byId("current-cash-note").textContent = data.cashCurrencies.length ? data.cashCurrencies.join(" · ") : "尚未填寫目前現金";
-  byId("running-grid-count").textContent = data.runningGridCount ? `${data.runningGridCount} 組` : "目前沒有";
-  byId("running-grid-pnl").textContent = data.runningGridCount ? `總損益 ${money(data.runningGridPnlUsd, "USDT", true)}` : "—";
-  setTone(byId("running-grid-pnl"), data.runningGridPnlUsd);
+  byId("running-grid-count").textContent = data.runningGridCount ? `${data.runningGridCount} 組` : data.staleGridCount ? "狀態待核對" : "目前沒有";
+  byId("running-grid-pnl").textContent = data.staleGridCount
+    ? `${data.staleGridCount} 組舊紀錄未計入${data.staleGridLastAt ? ` · 最近 ${shortDate(data.staleGridLastAt)}` : ""}`
+    : data.runningGridCount ? `總損益 ${money(data.runningGridPnlUsd, "USDT", true)}` : "—";
+  setTone(byId("running-grid-pnl"), data.staleGridCount ? 0 : data.runningGridPnlUsd);
 
   const groups = byId("asset-groups");
   groups.replaceChildren();
@@ -2177,6 +2181,7 @@ function renderOverviewTreemap(data) {
   const warning = byId("overview-treemap-warning");
   const notes = [];
   if (view.missingCount) notes.push(`${view.missingCount} 檔持倉缺少可用市值，未納入方塊。`);
+  if (data.staleGridCount) notes.push(`${data.staleGridCount} 組網格資料過期，未納入目前價值；結算金仍待核對。`);
   if (view.differenceTwd !== null && Math.abs(view.differenceTwd) >= 1) notes.push(`圖中項目合計與總資產相差 ${overviewMoney(view.differenceTwd, true)}；比例暫以圖中項目合計計算。`);
   warning.hidden = !notes.length;
   warning.textContent = notes.join(" ");
