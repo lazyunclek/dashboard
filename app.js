@@ -2101,6 +2101,7 @@ function renderOverview() {
     byId(noteId).textContent = `累積總損益 ${overviewMoney(group?.totalPnlTwd || 0, true)}`;
     setTone(byId(noteId), group?.totalPnlTwd || 0);
   }
+  renderCostValueChart(data);
   byId("property-valuation-button").hidden = !data.propertyValuation?.available;
   byId("usd-fx-rate").textContent = `${data.currentFx.toFixed(2)} TWD / USD`;
   byId("usd-fx-note").textContent = `匯兌損益 ${overviewMoney(data.usdFxPnlTwd, true)}`;
@@ -2129,6 +2130,31 @@ function renderOverview() {
 
   renderExposure();
 
+}
+
+function renderCostValueChart(data) {
+  const chart = byId("cost-value-chart");
+  const groups = data.groups;
+  const totalCost = groups.reduce((sum, group) => sum + num(group.costTwd), 0);
+  const pairs = [{ name: "全部資產", costTwd: totalCost, valueTwd: data.totalAssetsTwd, isTotal: true }, ...groups];
+  chart.replaceChildren();
+  for (const pair of pairs) {
+    const cost = num(pair.costTwd);
+    const value = num(pair.valueTwd);
+    const scale = Math.max(cost, value, 0);
+    const difference = value - cost;
+    const row = document.createElement("div");
+    row.className = `cost-value-row${pair.isTotal ? " is-total" : ""}`;
+    row.innerHTML = `
+      <div class="cost-value-row-head"><strong>${escapeHtml(pair.name)}</strong><span class="private-number ${difference > 0 ? "is-positive" : difference < 0 ? "is-negative" : ""}">帳面差額 ${overviewMoney(difference, true)}</span></div>
+      <div class="cost-value-pair">
+        <div class="cost-value-line"><span>成本</span><div class="cost-value-track"><i class="cost-value-bar is-cost" style="width:${scale > 0 ? Math.max(0, Math.min(100, cost / scale * 100)) : 0}%"></i></div><b class="private-number">${overviewMoney(cost)}</b></div>
+        <div class="cost-value-line"><span>目前價值</span><div class="cost-value-track"><i class="cost-value-bar is-value" style="width:${scale > 0 ? Math.max(0, Math.min(100, value / scale * 100)) : 0}%"></i></div><b class="private-number">${overviewMoney(value)}</b></div>
+      </div>`;
+    chart.append(row);
+  }
+  const missing = data.positions.filter((position) => position.marketValueTwd === null).length;
+  byId("cost-value-note").textContent = `各組橫條獨立縮放；帳面差額＝目前價值－成本，不含已實現損益與收益。房地產目前價值依預估可回收淨值，成本依已入帳支出。${missing ? `另有 ${missing} 檔持倉缺少市值，圖表比較可能不完整。` : ""}`;
 }
 
 function openPropertyValuation() {

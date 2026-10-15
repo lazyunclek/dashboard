@@ -258,6 +258,21 @@ input::placeholder { color: #53645a; }
 .asset-group-value { text-align: right; font: 700 12px/1 var(--mono); }
 .allocation-track { height: 5px; overflow: hidden; border-radius: 999px; background: rgba(143, 163, 152, 0.12); }
 .allocation-bar { height: 100%; border-radius: inherit; background: var(--accent); box-shadow: 0 0 12px rgba(136, 255, 86, 0.3); }
+.cost-value-card { display: grid; gap: 16px; }
+.cost-value-chart { display: grid; gap: 12px; }
+.cost-value-row { display: grid; gap: 9px; padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-soft); }
+.cost-value-row.is-total { border-color: var(--line-strong); background: rgba(20, 43, 27, 0.72); }
+.cost-value-row-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.cost-value-row-head strong { font-size: 12px; }
+.cost-value-row-head span { text-align: right; font: 700 10px/1.3 var(--mono); }
+.cost-value-pair { display: grid; gap: 7px; }
+.cost-value-line { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.cost-value-line > span { color: var(--muted); font-size: 9px; }
+.cost-value-line > b { min-width: 72px; text-align: right; font: 700 10px/1.2 var(--mono); }
+.cost-value-track { height: 10px; overflow: hidden; border-radius: 999px; background: rgba(143, 163, 152, 0.12); }
+.cost-value-bar { display: block; height: 100%; border-radius: inherit; }
+.cost-value-bar.is-cost { background: #7390a4; }
+.cost-value-bar.is-value { background: var(--accent); }
 .exposure-card { display: grid; gap: 14px; }
 .exposure-head { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; }
 .segmented-control { display: grid; grid-template-columns: repeat(2, auto); gap: 3px; padding: 3px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--bg-deep); }

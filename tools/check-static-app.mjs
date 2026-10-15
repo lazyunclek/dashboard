@@ -53,6 +53,7 @@ for (const token of ["function quoteFreshness", "marketPriceStatus", "行情過�
   if (!app.includes(token)) throw new Error(`Missing market-price freshness behavior: ${token}`);
 }
 if (!html.includes("重新讀取已同步行情")) throw new Error("Mobile refresh control must disclose that it rereads synchronized prices");
+if (!html.includes('id="cost-value-chart"') || !app.includes("function renderCostValueChart(data)") || !css.includes(".cost-value-bar.is-value")) throw new Error("Overview cost/value chart missing");
 for (const token of ["cashValueTwd", "runningGridCount", "runningGridPnlUsd"]) {
   if (!app.includes(token)) throw new Error(`Missing overview capital or strategy signal: ${token}`);
 }
