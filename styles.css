@@ -273,6 +273,39 @@ input::placeholder { color: #53645a; }
 .cost-value-bar { display: block; height: 100%; border-radius: inherit; }
 .cost-value-bar.is-cost { background: #7390a4; }
 .cost-value-bar.is-value { background: var(--accent); }
+.overview-treemap-card { display: grid; gap: 12px; }
+.overview-treemap-card .section-head { flex-wrap: wrap; }
+.overview-treemap-card .segmented-control { margin-left: auto; }
+.overview-treemap-legend { display: flex; flex-wrap: wrap; gap: 5px 10px; }
+.overview-treemap-legend span { display: inline-flex; gap: 5px; align-items: center; color: var(--muted); font-size: 9px; }
+.overview-treemap-legend span::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--legend-color); }
+.overview-treemap-legend span:nth-child(1) { --legend-color: #246547; }
+.overview-treemap-legend span:nth-child(2) { --legend-color: #285775; }
+.overview-treemap-legend span:nth-child(3) { --legend-color: #584476; }
+.overview-treemap-legend span:nth-child(4) { --legend-color: #6b6039; }
+.overview-treemap-legend span:nth-child(5) { --legend-color: #276763; }
+.overview-treemap-legend span:nth-child(6) { --legend-color: #64513d; }
+.overview-treemap-canvas { position: relative; height: 330px; min-width: 0; overflow: hidden; border-radius: 12px; background: #151c19; }
+.overview-treemap-canvas.is-empty { display: grid; place-items: center; padding: 20px; color: var(--muted); font-size: 11px; text-align: center; }
+.overview-treemap-tile { position: absolute; display: block; min-width: 0; min-height: 0; margin: 0; padding: 2px; overflow: hidden; border: 0; background: #222b26; text-align: center; cursor: pointer; }
+.overview-treemap-tile-inner { display: flex; width: 100%; height: 100%; min-width: 0; flex-direction: column; justify-content: center; align-items: center; gap: 4px; overflow: hidden; border-radius: 7px; padding: 3px; background: var(--overview-tile-bg); }
+.overview-treemap-tile.is-tw_equity { --overview-tile-bg: #246547; }
+.overview-treemap-tile.is-us_equity { --overview-tile-bg: #285775; }
+.overview-treemap-tile.is-crypto { --overview-tile-bg: #584476; }
+.overview-treemap-tile.is-cash { --overview-tile-bg: #6b6039; }
+.overview-treemap-tile.is-grid { --overview-tile-bg: #276763; }
+.overview-treemap-tile.is-property { --overview-tile-bg: #64513d; }
+.overview-treemap-tile.is-selected .overview-treemap-tile-inner { box-shadow: inset 0 0 0 2px #fff; }
+.overview-treemap-tile strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 750 clamp(10px, 3.4vw, 17px)/1.1 var(--sans); }
+.overview-treemap-tile small { font: 650 clamp(9px, 2.8vw, 13px)/1.1 var(--mono); }
+.overview-treemap-tile.is-small small, .overview-treemap-tile.is-micro .overview-treemap-tile-inner > * { display: none; }
+.overview-treemap-small-list { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+.overview-treemap-small-list button { display: grid; flex: 0 0 auto; gap: 3px; min-width: 64px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel-soft); text-align: left; }
+.overview-treemap-small-list button strong { font: 700 10px/1 var(--mono); }
+.overview-treemap-small-list button small { color: var(--muted); font: 9px/1.2 var(--mono); }
+.overview-treemap-small-list button.is-selected { border-color: var(--accent); color: var(--accent); }
+.overview-treemap-detail { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; min-height: 42px; padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel-soft); color: var(--muted); font-size: 10px; line-height: 1.5; }
+.overview-treemap-detail strong { color: var(--text); }
 .exposure-card { display: grid; gap: 14px; }
 .exposure-head { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; }
 .segmented-control { display: grid; grid-template-columns: repeat(2, auto); gap: 3px; padding: 3px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--bg-deep); }

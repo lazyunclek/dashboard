@@ -42,6 +42,37 @@ export function heatmapData(positions, filter = "all") {
   };
 }
 
+export function overviewTreemapData(data, scope = "all") {
+  const relevant = (data.positions || []).filter((row) => markets.includes(row.assetClass));
+  const positions = relevant.filter((row) => row.marketValueTwd !== null
+    && Number.isFinite(Number(row.marketValueTwd)) && Number(row.marketValueTwd) > 0);
+  const tiles = positions.map((row) => ({
+    id: `position:${row.id}`,
+    symbol: row.displaySymbol || row.symbol,
+    name: row.name || "",
+    category: ({ tw_equity: "台股", us_equity: "美股", crypto: "加密現貨" })[row.assetClass] || "其他持倉",
+    kind: row.assetClass,
+    marketValueTwd: Number(row.marketValueTwd)
+  }));
+  if (scope === "all") {
+    const groups = new Map((data.groups || []).map((row) => [row.key, row]));
+    const cryptoSpot = positions.filter((row) => row.assetClass === "crypto")
+      .reduce((sum, row) => sum + Number(row.marketValueTwd), 0);
+    for (const [id, symbol, name, kind, value] of [
+      ["overview:cash", "現金", "目前現金淨額", "cash", Number(groups.get("cash")?.valueTwd)],
+      ["overview:grid", "網格", "運行中網格淨值", "grid", Number(groups.get("crypto")?.valueTwd) - cryptoSpot],
+      ["overview:property", "房地產", "預估可回收淨值", "property", Number(groups.get("property")?.valueTwd)]
+    ]) {
+      if (Number.isFinite(value) && value > 0) tiles.push({ id, symbol, name, category: name, kind, marketValueTwd: value });
+    }
+  }
+  tiles.sort((a, b) => b.marketValueTwd - a.marketValueTwd);
+  const total = tiles.reduce((sum, row) => sum + row.marketValueTwd, 0);
+  const missingCount = relevant.filter((row) => row.marketValueTwd === null || !Number.isFinite(Number(row.marketValueTwd))).length;
+  const totalAssets = Number(data.totalAssetsTwd);
+  return { tiles, total, missingCount, differenceTwd: scope === "all" && Number.isFinite(totalAssets) ? total - totalAssets : null };
+}
+
 export function treemapRects(tiles) {
   const result = new Map();
   function visit(rows, x, y, width, height) {

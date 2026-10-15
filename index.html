@@ -140,6 +140,22 @@
           <p id="cost-value-note" class="exposure-note"></p>
         </section>
 
+        <section class="content-card overview-treemap-card" aria-labelledby="overview-treemap-title">
+          <div class="section-head">
+            <div><p class="eyebrow">PORTFOLIO MAP</p><h2 id="overview-treemap-title">總資產持有比例</h2></div>
+            <div class="segmented-control" role="group" aria-label="比例圖範圍">
+              <button type="button" data-overview-scope="all" class="is-active">全部資產</button>
+              <button type="button" data-overview-scope="holdings">投資持倉</button>
+            </div>
+          </div>
+          <p class="exposure-note" id="overview-treemap-note">方塊面積＝目前台幣價值。</p>
+          <div class="overview-treemap-legend" aria-label="資產顏色圖例"><span>台股</span><span>美股</span><span>加密</span><span>現金</span><span>網格</span><span>房地產</span></div>
+          <div class="overview-treemap-canvas" id="overview-treemap-canvas" role="group" aria-label="總資產持有比例方塊圖"></div>
+          <div class="overview-treemap-small-list" id="overview-treemap-small-list" aria-label="小面積資產代號" hidden></div>
+          <p class="exposure-warning" id="overview-treemap-warning" hidden></p>
+          <div class="overview-treemap-detail" id="overview-treemap-detail" aria-live="polite"></div>
+        </section>
+
         <section class="content-card">
           <div class="section-head">
             <div>

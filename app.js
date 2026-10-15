@@ -1,5 +1,5 @@
 import { scheduledCashProjection } from "./credit-card-reserves.mjs";
-import { dayMove, heatmapData, treemapRects } from "./position-heatmap.mjs";
+import { dayMove, heatmapData, overviewTreemapData, treemapRects } from "./position-heatmap.mjs";
 
 const config = window.__INVESTMENT_DASHBOARD_CONFIG__;
 
@@ -25,6 +25,8 @@ const state = {
   marketFilter: "all",
   heatmapMetric: "day",
   selectedHeatmapId: "",
+  selectedOverviewAssetId: "",
+  overviewTreemapScope: "all",
   positionStatus: "open",
   positionCurrency: "TWD",
   positionExpandedIds: new Set(),
@@ -2102,6 +2104,7 @@ function renderOverview() {
     setTone(byId(noteId), group?.totalPnlTwd || 0);
   }
   renderCostValueChart(data);
+  renderOverviewTreemap(data);
   byId("property-valuation-button").hidden = !data.propertyValuation?.available;
   byId("usd-fx-rate").textContent = `${data.currentFx.toFixed(2)} TWD / USD`;
   byId("usd-fx-note").textContent = `匯兌損益 ${overviewMoney(data.usdFxPnlTwd, true)}`;
@@ -2130,6 +2133,60 @@ function renderOverview() {
 
   renderExposure();
 
+}
+
+function renderOverviewTreemap(data) {
+  const view = overviewTreemapData(data, state.overviewTreemapScope);
+  byId("overview-treemap-title").textContent = state.overviewTreemapScope === "all" ? "總資產持有比例" : "投資持倉比例";
+  document.querySelectorAll("[data-overview-scope]").forEach((button) => button.classList.toggle("is-active", button.dataset.overviewScope === state.overviewTreemapScope));
+  byId("overview-treemap-note").textContent = state.overviewTreemapScope === "all"
+    ? "方塊面積＝目前台幣價值；包含台美股、加密現貨、現金、運行中網格與房地產。"
+    : "方塊面積＝目前台幣市值；只看現有台股、美股與加密現貨持倉。";
+  const canvas = byId("overview-treemap-canvas");
+  const smallList = byId("overview-treemap-small-list");
+  canvas.replaceChildren();
+  smallList.replaceChildren();
+  canvas.classList.toggle("is-empty", !view.tiles.length);
+  if (!view.tiles.length) canvas.textContent = "目前沒有可估值的資產";
+  else {
+    const rects = treemapRects(view.tiles);
+    for (const row of view.tiles) {
+      const rect = rects.get(row.id);
+      const percent = row.marketValueTwd / view.total * 100;
+      const tile = document.createElement("button");
+      tile.type = "button";
+      tile.className = `overview-treemap-tile is-${row.kind}${rect.width < 0.12 || rect.height < 0.13 ? " is-small" : ""}${rect.width < 0.06 || rect.height < 0.07 ? " is-micro" : ""}`;
+      tile.dataset.overviewAsset = row.id;
+      tile.style.left = `${rect.x * 100}%`;
+      tile.style.top = `${rect.y * 100}%`;
+      tile.style.width = `${rect.width * 100}%`;
+      tile.style.height = `${rect.height * 100}%`;
+      tile.setAttribute("aria-label", `${row.symbol}，占比 ${percent.toFixed(1)}%，點選查看明細`);
+      tile.innerHTML = `<span class="overview-treemap-tile-inner"><strong>${escapeHtml(row.symbol)}</strong><small class="private-number">${percent.toFixed(1)}%</small></span>`;
+      canvas.append(tile);
+      if (tile.classList.contains("is-micro")) {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.dataset.overviewAsset = row.id;
+        chip.innerHTML = `<strong>${escapeHtml(row.symbol)}</strong><small class="private-number">${percent.toFixed(1)}%</small>`;
+        smallList.append(chip);
+      }
+    }
+  }
+  smallList.hidden = !smallList.childElementCount;
+  const warning = byId("overview-treemap-warning");
+  const notes = [];
+  if (view.missingCount) notes.push(`${view.missingCount} 檔持倉缺少可用市值，未納入方塊。`);
+  if (view.differenceTwd !== null && Math.abs(view.differenceTwd) >= 1) notes.push(`圖中項目合計與總資產相差 ${overviewMoney(view.differenceTwd, true)}；比例暫以圖中項目合計計算。`);
+  warning.hidden = !notes.length;
+  warning.textContent = notes.join(" ");
+  const selected = view.tiles.find((row) => row.id === state.selectedOverviewAssetId);
+  const denominatorLabel = state.overviewTreemapScope === "holdings" ? "占投資持倉" : view.differenceTwd !== null && Math.abs(view.differenceTwd) >= 1 ? "占圖中資產" : "占總資產";
+  document.querySelectorAll("[data-overview-asset]").forEach((button) => button.classList.toggle("is-selected", button.dataset.overviewAsset === state.selectedOverviewAssetId));
+  const detail = byId("overview-treemap-detail");
+  detail.innerHTML = selected
+    ? `<strong>${escapeHtml(selected.symbol)} · ${escapeHtml(selected.category)}</strong><span class="private-number">${denominatorLabel} ${(selected.marketValueTwd / view.total * 100).toFixed(1)}% · ${overviewMoney(selected.marketValueTwd)}</span>`
+    : "點選方塊查看資產比例與目前價值。";
 }
 
 function renderCostValueChart(data) {
@@ -2380,6 +2437,20 @@ function selectHeatmapAsset(event) {
 }
 byId("heatmap-canvas").addEventListener("click", selectHeatmapAsset);
 byId("heatmap-small-list").addEventListener("click", selectHeatmapAsset);
+
+document.querySelectorAll("[data-overview-scope]").forEach((button) => button.addEventListener("click", () => {
+  state.overviewTreemapScope = button.dataset.overviewScope;
+  state.selectedOverviewAssetId = "";
+  renderOverviewTreemap(state.data);
+}));
+function selectOverviewAsset(event) {
+  const tile = event.target.closest("[data-overview-asset]");
+  if (!tile) return;
+  state.selectedOverviewAssetId = tile.dataset.overviewAsset;
+  renderOverviewTreemap(state.data);
+}
+byId("overview-treemap-canvas").addEventListener("click", selectOverviewAsset);
+byId("overview-treemap-small-list").addEventListener("click", selectOverviewAsset);
 
 document.querySelectorAll("[data-position-status]").forEach((button) => button.addEventListener("click", () => {
   state.positionStatus = button.dataset.positionStatus;

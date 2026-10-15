@@ -54,6 +54,7 @@ for (const token of ["function quoteFreshness", "marketPriceStatus", "行情過�
 }
 if (!html.includes("重新讀取已同步行情")) throw new Error("Mobile refresh control must disclose that it rereads synchronized prices");
 if (!html.includes('id="cost-value-chart"') || !app.includes("function renderCostValueChart(data)") || !css.includes(".cost-value-bar.is-value")) throw new Error("Overview cost/value chart missing");
+if (!html.includes('id="overview-treemap-canvas"') || !app.includes("function renderOverviewTreemap(data)") || !app.includes("overviewTreemapData(data, state.overviewTreemapScope)") || !css.includes(".overview-treemap-tile.is-property")) throw new Error("Overview asset treemap missing");
 for (const token of ["cashValueTwd", "runningGridCount", "runningGridPnlUsd"]) {
   if (!app.includes(token)) throw new Error(`Missing overview capital or strategy signal: ${token}`);
 }
