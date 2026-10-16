@@ -50,6 +50,15 @@ const holdingsOnly = overviewTreemapData(overview, "holdings");
 assert.equal(holdingsOnly.total, 1000);
 assert.equal(holdingsOnly.tiles.length, 3);
 assert.equal(holdingsOnly.differenceTwd, null);
+assert.deepEqual(holdingsOnly.marketTotals, { tw_equity: 300, us_equity: 200, crypto: 500 });
+assert.equal(holdingsOnly.marketTotal, 1000);
+const twHoldings = overviewTreemapData(overview, "holdings", "tw_equity");
+assert.equal(twHoldings.total, 300);
+assert.deepEqual(twHoldings.tiles.map((row) => row.id), ["position:tw"]);
+assert.equal(twHoldings.missingCount, 1);
+assert.equal(twHoldings.marketTotal, 1000);
+assert.equal(overviewTreemapData(overview, "holdings", "us_equity").total, 200);
+assert.equal(overviewTreemapData(overview, "holdings", "crypto").total, 500);
 assert.equal(overviewTreemapData({ ...overview, totalAssetsTwd: 1280, groups: overview.groups.map((row) => row.key === "cash" ? { ...row, valueTwd: -20 } : row) }).differenceTwd, 20);
 
 assert.ok(Math.abs(dayMove(rows[0]).percent - 10) < 0.000001);

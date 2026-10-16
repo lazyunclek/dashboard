@@ -54,7 +54,8 @@ for (const token of ["function quoteFreshness", "marketPriceStatus", "行情過�
 }
 if (!html.includes("重新讀取已同步行情")) throw new Error("Mobile refresh control must disclose that it rereads synchronized prices");
 if (!html.includes('id="cost-value-chart"') || !app.includes("function renderCostValueChart(data)") || !css.includes(".cost-value-bar.is-value")) throw new Error("Overview cost/value chart missing");
-if (!html.includes('id="overview-treemap-canvas"') || !app.includes("function renderOverviewTreemap(data)") || !app.includes("overviewTreemapData(data, state.overviewTreemapScope)") || !css.includes(".overview-treemap-tile.is-property")) throw new Error("Overview asset treemap missing");
+if (!html.includes('id="overview-treemap-canvas"') || !app.includes("function renderOverviewTreemap(data)") || !app.includes("overviewTreemapData(data, state.overviewTreemapScope, state.overviewTreemapMarket)") || !css.includes(".overview-treemap-tile.is-property")) throw new Error("Overview asset treemap missing");
+if (!html.includes('id="overview-treemap-scroll"') || !css.includes("overflow-x: auto") || !html.includes('data-overview-market="crypto"') || !app.includes("view.marketTotals[market] / view.marketTotal")) throw new Error("Overview swipe and market mix controls missing");
 if (!app.includes("classifyGridRecords(gridRecords)") || !app.includes("staleGridCount") || !app.includes("不含 ${data.staleGridCount} 組過期網格資料")) throw new Error("Stale grid valuation guard missing");
 for (const token of ["cashValueTwd", "runningGridCount", "runningGridPnlUsd"]) {
   if (!app.includes(token)) throw new Error(`Missing overview capital or strategy signal: ${token}`);

@@ -278,6 +278,7 @@ input::placeholder { color: #53645a; }
 .overview-treemap-card .segmented-control { margin-left: auto; }
 .overview-treemap-legend { display: flex; flex-wrap: wrap; gap: 5px 10px; }
 .overview-treemap-legend span { display: inline-flex; gap: 5px; align-items: center; color: var(--muted); font-size: 9px; }
+.overview-treemap-legend span[hidden] { display: none; }
 .overview-treemap-legend span::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--legend-color); }
 .overview-treemap-legend span:nth-child(1) { --legend-color: #246547; }
 .overview-treemap-legend span:nth-child(2) { --legend-color: #285775; }
@@ -285,7 +286,16 @@ input::placeholder { color: #53645a; }
 .overview-treemap-legend span:nth-child(4) { --legend-color: #6b6039; }
 .overview-treemap-legend span:nth-child(5) { --legend-color: #276763; }
 .overview-treemap-legend span:nth-child(6) { --legend-color: #64513d; }
-.overview-treemap-canvas { position: relative; height: 330px; min-width: 0; overflow: hidden; border-radius: 12px; background: #151c19; }
+.overview-treemap-markets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.overview-treemap-markets[hidden] { display: none; }
+.overview-treemap-markets button { display: grid; gap: 4px; min-width: 0; padding: 9px 5px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-soft); color: var(--muted); text-align: center; }
+.overview-treemap-markets button.is-active { border-color: var(--accent); background: rgba(136, 255, 86, .13); color: var(--text); }
+.overview-treemap-markets button strong { font-size: 10px; }
+.overview-treemap-markets button small { font: 700 10px/1.1 var(--mono); }
+.overview-treemap-scroll-hint { margin: -3px 0 0; color: var(--muted); font-size: 9px; }
+.overview-treemap-scroll { max-width: 100%; overflow-x: auto; overflow-y: hidden; border-radius: 12px; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.overview-treemap-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.overview-treemap-canvas { position: relative; width: max(100%, 860px); height: 410px; overflow: hidden; border-radius: 12px; background: #151c19; }
 .overview-treemap-canvas.is-empty { display: grid; place-items: center; padding: 20px; color: var(--muted); font-size: 11px; text-align: center; }
 .overview-treemap-tile { position: absolute; display: block; min-width: 0; min-height: 0; margin: 0; padding: 2px; overflow: hidden; border: 0; background: #222b26; text-align: center; cursor: pointer; }
 .overview-treemap-tile-inner { display: flex; width: 100%; height: 100%; min-width: 0; flex-direction: column; justify-content: center; align-items: center; gap: 4px; overflow: hidden; border-radius: 7px; padding: 3px; background: var(--overview-tile-bg); }

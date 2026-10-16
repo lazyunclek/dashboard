@@ -28,6 +28,7 @@ const state = {
   selectedHeatmapId: "",
   selectedOverviewAssetId: "",
   overviewTreemapScope: "all",
+  overviewTreemapMarket: "all",
   positionStatus: "open",
   positionCurrency: "TWD",
   positionExpandedIds: new Set(),
@@ -2140,12 +2141,28 @@ function renderOverview() {
 }
 
 function renderOverviewTreemap(data) {
-  const view = overviewTreemapData(data, state.overviewTreemapScope);
-  byId("overview-treemap-title").textContent = state.overviewTreemapScope === "all" ? "總資產持有比例" : "投資持倉比例";
+  const view = overviewTreemapData(data, state.overviewTreemapScope, state.overviewTreemapMarket);
+  const selectedMarketName = ({ tw_equity: "台股", us_equity: "美股", crypto: "加密" })[state.overviewTreemapMarket];
+  byId("overview-treemap-title").textContent = state.overviewTreemapScope === "all" ? "總資產持有比例" : selectedMarketName ? `${selectedMarketName}持倉比例` : "投資持倉比例";
   document.querySelectorAll("[data-overview-scope]").forEach((button) => button.classList.toggle("is-active", button.dataset.overviewScope === state.overviewTreemapScope));
+  const marketControls = byId("overview-treemap-markets");
+  marketControls.hidden = state.overviewTreemapScope !== "holdings";
+  marketControls.querySelectorAll("[data-overview-market]").forEach((button) => {
+    const market = button.dataset.overviewMarket;
+    const percent = market === "all" ? 100 : view.marketTotal > 0 ? view.marketTotals[market] / view.marketTotal * 100 : 0;
+    button.querySelector("small").textContent = view.marketTotal > 0 ? `${percent.toFixed(1)}%` : "—";
+    button.classList.toggle("is-active", market === state.overviewTreemapMarket);
+    button.setAttribute("aria-pressed", String(market === state.overviewTreemapMarket));
+  });
+  document.querySelectorAll("[data-overview-legend]").forEach((label) => {
+    label.hidden = state.overviewTreemapScope === "holdings"
+      && (state.overviewTreemapMarket === "all" ? !["tw_equity", "us_equity", "crypto"].includes(label.dataset.overviewLegend)
+        : label.dataset.overviewLegend !== state.overviewTreemapMarket);
+  });
   byId("overview-treemap-note").textContent = state.overviewTreemapScope === "all"
     ? "方塊面積＝目前台幣價值；包含台美股、加密現貨、現金、運行中網格與房地產。"
-    : "方塊面積＝目前台幣市值；只看現有台股、美股與加密現貨持倉。";
+    : selectedMarketName ? `方塊面積＝目前台幣市值；格內占比以${selectedMarketName}持倉為分母，按鈕占比以全部投資持倉為分母。`
+      : "方塊面積＝目前台幣市值；格內與按鈕占比均以全部投資持倉為分母。";
   const canvas = byId("overview-treemap-canvas");
   const smallList = byId("overview-treemap-small-list");
   canvas.replaceChildren();
@@ -2186,7 +2203,7 @@ function renderOverviewTreemap(data) {
   warning.hidden = !notes.length;
   warning.textContent = notes.join(" ");
   const selected = view.tiles.find((row) => row.id === state.selectedOverviewAssetId);
-  const denominatorLabel = state.overviewTreemapScope === "holdings" ? "占投資持倉" : view.differenceTwd !== null && Math.abs(view.differenceTwd) >= 1 ? "占圖中資產" : "占總資產";
+  const denominatorLabel = state.overviewTreemapScope === "holdings" ? selectedMarketName ? `占${selectedMarketName}持倉` : "占投資持倉" : view.differenceTwd !== null && Math.abs(view.differenceTwd) >= 1 ? "占圖中資產" : "占總資產";
   document.querySelectorAll("[data-overview-asset]").forEach((button) => button.classList.toggle("is-selected", button.dataset.overviewAsset === state.selectedOverviewAssetId));
   const detail = byId("overview-treemap-detail");
   detail.innerHTML = selected
@@ -2445,7 +2462,15 @@ byId("heatmap-small-list").addEventListener("click", selectHeatmapAsset);
 
 document.querySelectorAll("[data-overview-scope]").forEach((button) => button.addEventListener("click", () => {
   state.overviewTreemapScope = button.dataset.overviewScope;
+  state.overviewTreemapMarket = "all";
   state.selectedOverviewAssetId = "";
+  byId("overview-treemap-scroll").scrollLeft = 0;
+  renderOverviewTreemap(state.data);
+}));
+document.querySelectorAll("[data-overview-market]").forEach((button) => button.addEventListener("click", () => {
+  state.overviewTreemapMarket = button.dataset.overviewMarket;
+  state.selectedOverviewAssetId = "";
+  byId("overview-treemap-scroll").scrollLeft = 0;
   renderOverviewTreemap(state.data);
 }));
 function selectOverviewAsset(event) {

@@ -42,11 +42,16 @@ export function heatmapData(positions, filter = "all") {
   };
 }
 
-export function overviewTreemapData(data, scope = "all") {
+export function overviewTreemapData(data, scope = "all", marketFilter = "all") {
   const relevant = (data.positions || []).filter((row) => markets.includes(row.assetClass));
   const positions = relevant.filter((row) => row.marketValueTwd !== null
     && Number.isFinite(Number(row.marketValueTwd)) && Number(row.marketValueTwd) > 0);
-  const tiles = positions.map((row) => ({
+  const marketTotals = Object.fromEntries(markets.map((market) => [market, 0]));
+  for (const row of positions) marketTotals[row.assetClass] += Number(row.marketValueTwd);
+  const marketTotal = Object.values(marketTotals).reduce((sum, value) => sum + value, 0);
+  const selected = scope === "holdings" && markets.includes(marketFilter)
+    ? positions.filter((row) => row.assetClass === marketFilter) : positions;
+  const tiles = selected.map((row) => ({
     id: `position:${row.id}`,
     symbol: row.displaySymbol || row.symbol,
     name: row.name || "",
@@ -68,9 +73,11 @@ export function overviewTreemapData(data, scope = "all") {
   }
   tiles.sort((a, b) => b.marketValueTwd - a.marketValueTwd);
   const total = tiles.reduce((sum, row) => sum + row.marketValueTwd, 0);
-  const missingCount = relevant.filter((row) => row.marketValueTwd === null || !Number.isFinite(Number(row.marketValueTwd))).length;
+  const missingCount = relevant.filter((row) => (scope !== "holdings" || marketFilter === "all" || row.assetClass === marketFilter)
+    && (row.marketValueTwd === null || !Number.isFinite(Number(row.marketValueTwd)))).length;
   const totalAssets = Number(data.totalAssetsTwd);
-  return { tiles, total, missingCount, differenceTwd: scope === "all" && Number.isFinite(totalAssets) ? total - totalAssets : null };
+  return { tiles, total, missingCount, marketTotals, marketTotal,
+    differenceTwd: scope === "all" && Number.isFinite(totalAssets) ? total - totalAssets : null };
 }
 
 export function treemapRects(tiles) {
