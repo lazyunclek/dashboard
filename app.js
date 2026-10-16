@@ -1,5 +1,5 @@
 import { scheduledCashProjection } from "./credit-card-reserves.mjs";
-import { dayMove, heatmapData, overviewTreemapData, treemapRects } from "./position-heatmap.mjs";
+import { dayMove, heatmapData, overviewTreemapData, overviewTileLabelMode, treemapRects } from "./position-heatmap.mjs";
 import { classifyGridRecords } from "./grid-valuation.mjs";
 
 const config = window.__INVESTMENT_DASHBOARD_CONFIG__;
@@ -2166,7 +2166,7 @@ function renderOverviewTreemap(data) {
       : "方塊面積＝目前台幣市值；格內與按鈕占比均以全部投資持倉為分母。";
   const canvas = byId("overview-treemap-canvas");
   const smallList = byId("overview-treemap-small-list");
-  setOverviewTreemapZoom(state.overviewTreemapZoom);
+  setOverviewTreemapZoom(state.overviewTreemapZoom, undefined, false);
   canvas.replaceChildren();
   smallList.replaceChildren();
   canvas.classList.toggle("is-empty", !view.tiles.length);
@@ -2178,7 +2178,7 @@ function renderOverviewTreemap(data) {
       const percent = row.marketValueTwd / view.total * 100;
       const tile = document.createElement("button");
       tile.type = "button";
-      tile.className = `overview-treemap-tile is-${row.kind}${rect.width < 0.12 || rect.height < 0.13 ? " is-small" : ""}${rect.width < 0.06 || rect.height < 0.07 ? " is-micro" : ""}`;
+      tile.className = `overview-treemap-tile is-${row.kind}`;
       tile.dataset.overviewAsset = row.id;
       tile.style.left = `${rect.x * 100}%`;
       tile.style.top = `${rect.y * 100}%`;
@@ -2187,16 +2187,9 @@ function renderOverviewTreemap(data) {
       tile.setAttribute("aria-label", `${row.symbol}，占比 ${percent.toFixed(1)}%，點選查看明細`);
       tile.innerHTML = `<span class="overview-treemap-tile-inner"><strong>${escapeHtml(row.symbol)}</strong><small class="private-number">${percent.toFixed(1)}%</small></span>`;
       canvas.append(tile);
-      if (tile.classList.contains("is-micro")) {
-        const chip = document.createElement("button");
-        chip.type = "button";
-        chip.dataset.overviewAsset = row.id;
-        chip.innerHTML = `<strong>${escapeHtml(row.symbol)}</strong><small class="private-number">${percent.toFixed(1)}%</small>`;
-        smallList.append(chip);
-      }
     }
   }
-  smallList.hidden = !smallList.childElementCount;
+  syncOverviewTreemapTileLabels();
   const warning = byId("overview-treemap-warning");
   const notes = [];
   if (view.missingCount) notes.push(`${view.missingCount} 檔持倉缺少可用市值，未納入方塊。`);
@@ -2219,7 +2212,35 @@ function overviewTreemapZoomBounds() {
   return { baseWidth, min: viewport.clientWidth / baseWidth, max: 2.5 };
 }
 
-function setOverviewTreemapZoom(requested, anchorX) {
+function syncOverviewTreemapTileLabels() {
+  const canvas = byId("overview-treemap-canvas");
+  const smallList = byId("overview-treemap-small-list");
+  const canvasWidth = parseFloat(canvas.style.width) || canvas.clientWidth;
+  const canvasHeight = parseFloat(canvas.style.height) || canvas.clientHeight;
+  smallList.replaceChildren();
+  canvas.querySelectorAll(".overview-treemap-tile").forEach((tile) => {
+    const width = canvasWidth * parseFloat(tile.style.width) / 100;
+    const height = canvasHeight * parseFloat(tile.style.height) / 100;
+    const mode = overviewTileLabelMode(width, height);
+    tile.classList.toggle("is-small", mode === "small");
+    tile.classList.toggle("is-micro", mode === "micro");
+    if (mode !== "micro") return;
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.dataset.overviewAsset = tile.dataset.overviewAsset;
+    chip.classList.toggle("is-selected", chip.dataset.overviewAsset === state.selectedOverviewAssetId);
+    const label = document.createElement("strong");
+    label.textContent = tile.querySelector("strong").textContent;
+    const percentage = document.createElement("small");
+    percentage.className = "private-number";
+    percentage.textContent = tile.querySelector("small").textContent;
+    chip.append(label, percentage);
+    smallList.append(chip);
+  });
+  smallList.hidden = !smallList.childElementCount;
+}
+
+function setOverviewTreemapZoom(requested, anchorX, refreshLabels = true) {
   const viewport = byId("overview-treemap-scroll");
   const canvas = byId("overview-treemap-canvas");
   const { baseWidth, min, max } = overviewTreemapZoomBounds();
@@ -2235,6 +2256,7 @@ function setOverviewTreemapZoom(requested, anchorX) {
   byId("overview-treemap-scroll").setAttribute("aria-label", `可左右滑動及雙指縮放的持有比例圖，目前 ${Math.round(state.overviewTreemapZoom * 100)}%`);
   document.querySelector('[data-overview-zoom="out"]').disabled = state.overviewTreemapZoom <= min + 0.005;
   document.querySelector('[data-overview-zoom="in"]').disabled = state.overviewTreemapZoom >= max - 0.005;
+  if (refreshLabels) syncOverviewTreemapTileLabels();
 }
 
 function renderCostValueChart(data) {

@@ -107,3 +107,8 @@ export function treemapRects(tiles) {
   visit(tiles, 0, 0, 1, 1);
   return result;
 }
+export function overviewTileLabelMode(width, height) {
+  if (width < 54 || height < 42) return "micro";
+  if (width < 104 || height < 66) return "small";
+  return "full";
+}

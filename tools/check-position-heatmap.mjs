@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { dayMove, heatmapData, overviewTreemapData, treemapRects } from "../position-heatmap.mjs";
+import { dayMove, heatmapData, overviewTreemapData, overviewTileLabelMode, treemapRects } from "../position-heatmap.mjs";
 
 const rows = [
   { id: "tw", assetClass: "tw_equity", marketValueTwd: 300, primarySector: "半導體", marketPrice: 110, dayBaselinePrice: 100, dayBaselineKind: "previous_session_close", marketPriceStatus: "fresh", quantity: 10, marketPriceCurrency: "TWD", currentFx: 32 },
@@ -60,6 +60,11 @@ assert.equal(twHoldings.marketTotal, 1000);
 assert.equal(overviewTreemapData(overview, "holdings", "us_equity").total, 200);
 assert.equal(overviewTreemapData(overview, "holdings", "crypto").total, 500);
 assert.equal(overviewTreemapData({ ...overview, totalAssetsTwd: 1280, groups: overview.groups.map((row) => row.key === "cash" ? { ...row, valueTwd: -20 } : row) }).differenceTwd, 20);
+assert.equal(overviewTileLabelMode(40, 40), "micro");
+assert.equal(overviewTileLabelMode(80, 60), "small");
+assert.equal(overviewTileLabelMode(330, 95), "full");
+assert.equal(overviewTileLabelMode(860 * 0.1, 410 * 0.1), "micro");
+assert.equal(overviewTileLabelMode(2150 * 0.1, 1025 * 0.1), "full");
 
 assert.ok(Math.abs(dayMove(rows[0]).percent - 10) < 0.000001);
 assert.equal(dayMove(rows[1]).amountTwd, 3200);
