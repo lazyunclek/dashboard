@@ -156,7 +156,15 @@
             <button type="button" data-overview-market="crypto"><strong>加密</strong><small class="private-number">—</small></button>
           </div>
           <div class="overview-treemap-legend" aria-label="資產顏色圖例"><span data-overview-legend="tw_equity">台股</span><span data-overview-legend="us_equity">美股</span><span data-overview-legend="crypto">加密</span><span data-overview-legend="cash">現金</span><span data-overview-legend="grid">網格</span><span data-overview-legend="property">房地產</span></div>
-          <p class="overview-treemap-scroll-hint">在圖上左右滑動，查看較小的持倉 →</p>
+          <div class="overview-treemap-toolbar">
+            <p class="overview-treemap-scroll-hint">左右滑動 · 雙指縮放圖表</p>
+            <div class="overview-treemap-zoom" role="group" aria-label="比例圖縮放">
+              <button type="button" data-overview-zoom="out" aria-label="縮小比例圖">−</button>
+              <button type="button" data-overview-zoom="fit">全圖</button>
+              <button type="button" data-overview-zoom="reset" id="overview-treemap-zoom-level" aria-label="回到比例圖 100%">100%</button>
+              <button type="button" data-overview-zoom="in" aria-label="放大比例圖">＋</button>
+            </div>
+          </div>
           <div class="overview-treemap-scroll" id="overview-treemap-scroll" tabindex="0" role="region" aria-label="可左右滑動的持有比例圖">
             <div class="overview-treemap-canvas" id="overview-treemap-canvas" role="group" aria-label="總資產持有比例方塊圖"></div>
           </div>

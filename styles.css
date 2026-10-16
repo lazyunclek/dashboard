@@ -292,8 +292,13 @@ input::placeholder { color: #53645a; }
 .overview-treemap-markets button.is-active { border-color: var(--accent); background: rgba(136, 255, 86, .13); color: var(--text); }
 .overview-treemap-markets button strong { font-size: 10px; }
 .overview-treemap-markets button small { font: 700 10px/1.1 var(--mono); }
-.overview-treemap-scroll-hint { margin: -3px 0 0; color: var(--muted); font-size: 9px; }
-.overview-treemap-scroll { max-width: 100%; overflow-x: auto; overflow-y: hidden; border-radius: 12px; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.overview-treemap-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 7px; }
+.overview-treemap-scroll-hint { margin: 0; color: var(--muted); font-size: 9px; }
+.overview-treemap-zoom { display: flex; gap: 4px; align-items: center; }
+.overview-treemap-zoom button { min-width: 29px; min-height: 29px; padding: 4px 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel-soft); color: var(--text); font: 700 10px/1 var(--mono); }
+.overview-treemap-zoom button:disabled { opacity: .4; }
+.overview-treemap-zoom button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.overview-treemap-scroll { max-width: 100%; overflow-x: auto; overflow-y: hidden; border-radius: 12px; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; touch-action: pan-x pan-y; }
 .overview-treemap-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .overview-treemap-canvas { position: relative; width: max(100%, 860px); height: 410px; overflow: hidden; border-radius: 12px; background: #151c19; }
 .overview-treemap-canvas.is-empty { display: grid; place-items: center; padding: 20px; color: var(--muted); font-size: 11px; text-align: center; }

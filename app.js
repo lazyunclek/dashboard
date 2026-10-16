@@ -29,6 +29,7 @@ const state = {
   selectedOverviewAssetId: "",
   overviewTreemapScope: "all",
   overviewTreemapMarket: "all",
+  overviewTreemapZoom: 1,
   positionStatus: "open",
   positionCurrency: "TWD",
   positionExpandedIds: new Set(),
@@ -2165,6 +2166,7 @@ function renderOverviewTreemap(data) {
       : "方塊面積＝目前台幣市值；格內與按鈕占比均以全部投資持倉為分母。";
   const canvas = byId("overview-treemap-canvas");
   const smallList = byId("overview-treemap-small-list");
+  setOverviewTreemapZoom(state.overviewTreemapZoom);
   canvas.replaceChildren();
   smallList.replaceChildren();
   canvas.classList.toggle("is-empty", !view.tiles.length);
@@ -2209,6 +2211,30 @@ function renderOverviewTreemap(data) {
   detail.innerHTML = selected
     ? `<strong>${escapeHtml(selected.symbol)} · ${escapeHtml(selected.category)}</strong><span class="private-number">${denominatorLabel} ${(selected.marketValueTwd / view.total * 100).toFixed(1)}% · ${overviewMoney(selected.marketValueTwd)}</span>`
     : "點選方塊查看資產比例與目前價值。";
+}
+
+function overviewTreemapZoomBounds() {
+  const viewport = byId("overview-treemap-scroll");
+  const baseWidth = Math.max(860, viewport.clientWidth);
+  return { baseWidth, min: viewport.clientWidth / baseWidth, max: 2.5 };
+}
+
+function setOverviewTreemapZoom(requested, anchorX) {
+  const viewport = byId("overview-treemap-scroll");
+  const canvas = byId("overview-treemap-canvas");
+  const { baseWidth, min, max } = overviewTreemapZoomBounds();
+  const oldWidth = canvas.getBoundingClientRect().width || baseWidth;
+  state.overviewTreemapZoom = Math.min(max, Math.max(min, requested));
+  canvas.style.width = `${baseWidth * state.overviewTreemapZoom}px`;
+  canvas.style.height = `${410 * state.overviewTreemapZoom}px`;
+  const pointX = anchorX ?? viewport.clientWidth / 2;
+  viewport.scrollLeft = (viewport.scrollLeft + pointX) * canvas.getBoundingClientRect().width / oldWidth - pointX;
+  const level = byId("overview-treemap-zoom-level");
+  level.textContent = `${Math.round(state.overviewTreemapZoom * 100)}%`;
+  level.setAttribute("aria-label", `目前 ${Math.round(state.overviewTreemapZoom * 100)}%，點選回到 100%`);
+  byId("overview-treemap-scroll").setAttribute("aria-label", `可左右滑動及雙指縮放的持有比例圖，目前 ${Math.round(state.overviewTreemapZoom * 100)}%`);
+  document.querySelector('[data-overview-zoom="out"]').disabled = state.overviewTreemapZoom <= min + 0.005;
+  document.querySelector('[data-overview-zoom="in"]').disabled = state.overviewTreemapZoom >= max - 0.005;
 }
 
 function renderCostValueChart(data) {
@@ -2403,6 +2429,7 @@ function showTab(tabName) {
   dashboardView.dataset.activeTab = tabName;
   document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.tab === tabName));
   document.querySelectorAll(".tab-panel").forEach((panel) => { panel.hidden = panel.dataset.panel !== tabName; });
+  if (tabName === "overview" && state.data) setOverviewTreemapZoom(state.overviewTreemapZoom);
   if (tabName === "cashbook" && !state.cashbook.loaded && !state.cashbook.loading) void loadCashbook();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -2474,6 +2501,7 @@ document.querySelectorAll("[data-overview-market]").forEach((button) => button.a
   renderOverviewTreemap(state.data);
 }));
 function selectOverviewAsset(event) {
+  if (Date.now() < overviewPinchClickBlockUntil) return;
   const tile = event.target.closest("[data-overview-asset]");
   if (!tile) return;
   state.selectedOverviewAssetId = tile.dataset.overviewAsset;
@@ -2481,6 +2509,34 @@ function selectOverviewAsset(event) {
 }
 byId("overview-treemap-canvas").addEventListener("click", selectOverviewAsset);
 byId("overview-treemap-small-list").addEventListener("click", selectOverviewAsset);
+document.querySelectorAll("[data-overview-zoom]").forEach((button) => button.addEventListener("click", () => {
+  const action = button.dataset.overviewZoom;
+  const min = overviewTreemapZoomBounds().min;
+  setOverviewTreemapZoom(action === "fit" ? min : action === "reset" ? 1
+    : action === "in" ? state.overviewTreemapZoom * 1.25 : state.overviewTreemapZoom / 1.25);
+}));
+const overviewScroll = byId("overview-treemap-scroll");
+let overviewPinch = null;
+let overviewPinchClickBlockUntil = 0;
+const touchDistance = (touches) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+overviewScroll.addEventListener("touchstart", (event) => {
+  if (event.touches.length === 2) {
+    const distance = touchDistance(event.touches);
+    if (distance > 0) overviewPinch = { distance, zoom: state.overviewTreemapZoom };
+  }
+}, { passive: true });
+overviewScroll.addEventListener("touchmove", (event) => {
+  if (!overviewPinch || event.touches.length !== 2) return;
+  if (event.cancelable) event.preventDefault();
+  overviewPinchClickBlockUntil = Date.now() + 350;
+  const centerX = (event.touches[0].clientX + event.touches[1].clientX) / 2 - overviewScroll.getBoundingClientRect().left;
+  setOverviewTreemapZoom(overviewPinch.zoom * touchDistance(event.touches) / overviewPinch.distance, centerX);
+}, { passive: false });
+overviewScroll.addEventListener("touchend", () => { overviewPinch = null; });
+overviewScroll.addEventListener("touchcancel", () => { overviewPinch = null; });
+window.addEventListener("resize", () => {
+  if (state.data) setOverviewTreemapZoom(state.overviewTreemapZoom);
+});
 
 document.querySelectorAll("[data-position-status]").forEach((button) => button.addEventListener("click", () => {
   state.positionStatus = button.dataset.positionStatus;
