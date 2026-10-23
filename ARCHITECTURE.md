@@ -20,6 +20,8 @@
 
 ## 資料與權限邊界
 
+穩定幣美股交易仍把股票成交資料存成 USD `investment_transactions`；`investment_stablecoin_settlements` 是 owner RLS 保護的實際 USDC／USDT 收付紀錄。前端只讀這張表與投資帳戶，在交易明細同時列出平台、USD 成交與實扣／實收穩定幣。`funding-allocation.mjs` 用各幣別已記錄的 TWD 購買成本與同平台股票買賣 FIFO 計算仍持有美股的穩定幣來源成本；缺少成本會顯示待核對。此數字只供分類揭露，不會增加總資產或全體外部投入。新平台資金帳戶與交易仍須憑真實明細建立，前端不提供投資寫入。
+
 瀏覽器可以使用 Supabase URL、publishable key 與允許公開的 project reference；RLS、公開 feed function 與受控 RPC 決定資料能否被讀寫。service-role key、OAuth secret、交易所 key、Meta secret 與其他服務端密鑰不得進入 `config.js`、`app.js`、GitHub Pages artifact 或任何前端 bundle。
 
 投資區以 Supabase 正式資料和資料契約為準。日常帳本的「預定」是獨立 `cashbook_schedules` 資料：在寫入正式 `cashbook_events` 前絕不改變帳戶餘額；到期且選擇自動入帳時，資料庫排程以固定冪等鍵委派既有正式分錄 writer。帳戶清單的主數字同樣只讀已發生帳目；點開才顯示未來流向。記帳操作使用 allowlisted RPC，不要新增任意 SQL endpoint。

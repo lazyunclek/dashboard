@@ -1,6 +1,7 @@
 import { scheduledCashProjection } from "./credit-card-reserves.mjs";
 import { dayMove, heatmapData, overviewTreemapData, overviewTileLabelMode, treemapRects } from "./position-heatmap.mjs";
 import { classifyGridRecords } from "./grid-valuation.mjs";
+import { stablecoinEquityAllocation } from "./funding-allocation.mjs";
 
 const config = window.__INVESTMENT_DASHBOARD_CONFIG__;
 
@@ -427,6 +428,8 @@ function buildDashboard(raw) {
   const components = raw.components.filter((row) => row.portfolio_id === portfolioId);
   const gridRecords = raw.gridRecords.filter((row) => row.portfolio_id === portfolioId);
   const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
+  const accountsById = new Map((raw.accounts || []).map((account) => [account.id, account]));
+  const settlementsByTransactionId = new Map((raw.stablecoinSettlements || []).map((settlement) => [settlement.transaction_id, settlement]));
 
   const latestPrices = new Map();
   for (const price of raw.marketPrices.filter((row) => row.portfolio_id === portfolioId && row.status === "success")) {
@@ -445,6 +448,14 @@ function buildDashboard(raw) {
   const fundingQty = fundingBuys.reduce((sum, row) => sum + num(row.quantity), 0);
   const fundingPaid = fundingBuys.reduce((sum, row) => sum + Math.abs(num(row.net_cash_amount) || num(row.gross_amount) + num(row.fee_amount) + num(row.tax_amount)), 0);
   const pooledCostFx = fundingQty > 0 ? fundingPaid / fundingQty : currentFx;
+  const fundingRates = Object.fromEntries(["USDC", "USDT"].map((currency) => {
+    const fundingAssetIds = new Set(fundingAssets.filter((asset) => String(asset.symbol).toUpperCase() === currency).map((asset) => asset.id));
+    const buys = fundingBuys.filter((row) => fundingAssetIds.has(row.asset_id));
+    const units = buys.reduce((sum, row) => sum + num(row.quantity), 0);
+    const paid = buys.reduce((sum, row) => sum + Math.abs(num(row.net_cash_amount) || num(row.gross_amount)), 0);
+    return [currency, units > 0 ? paid / units : null];
+  }));
+  const stablecoinAllocation = stablecoinEquityAllocation(transactions, assets, raw.stablecoinSettlements || [], fundingRates);
 
   const incomeByAsset = new Map();
   const incomeNativeByAsset = new Map();
@@ -800,6 +811,9 @@ function buildDashboard(raw) {
     closedPositions: closedPositions.sort((a, b) => String(b.lastTransactionDate || "").localeCompare(String(a.lastTransactionDate || ""))),
     allPositions: investablePositions,
     transactions: transactions.sort((a, b) => String(b.trade_date).localeCompare(String(a.trade_date)) || String(b.created_at).localeCompare(String(a.created_at))),
+    accountsById,
+    settlementsByTransactionId,
+    stablecoinAllocation,
     incomeEvents: incomeEvents.sort((a, b) => String(b.event_date).localeCompare(String(a.event_date))),
     assetsById,
     groups,
@@ -842,7 +856,7 @@ async function loadDashboard() {
     const portfolioId = portfolios[0]?.id;
     if (!portfolioId) throw new Error("這個帳號沒有可用的投資組合");
     const filter = `portfolio_id=eq.${encodeURIComponent(portfolioId)}`;
-    const [assets, transactions, incomeEvents, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents, propertyValuationAssumptions, capitalRecoveryRows] = await Promise.all([
+    const [assets, transactions, incomeEvents, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents, propertyValuationAssumptions, capitalRecoveryRows, accounts, stablecoinSettlements] = await Promise.all([
       fetchAll(`investment_assets?select=id,portfolio_id,symbol,name,asset_class,market,quote_currency,quantity_unit,quantity_scale,price_scale,amount_scale,metadata&${filter}&order=symbol.asc`),
       fetchAll(`investment_transactions?select=id,portfolio_id,account_id,asset_id,transaction_type,trade_date,quantity,unit_price,gross_amount,fee_amount,tax_amount,net_cash_amount,settlement_currency,source_row_id,status,details,created_at,updated_at&status=neq.voided&${filter}&order=trade_date.desc,created_at.desc`),
       fetchAll(`investment_income_events?select=id,portfolio_id,account_id,asset_id,income_type,event_date,gross_amount,withholding_tax,fee_amount,net_amount,currency,status,details,created_at,updated_at&status=neq.voided&${filter}&order=event_date.desc,created_at.desc`),
@@ -852,10 +866,12 @@ async function loadDashboard() {
       fetchAll("cashbook_events?select=id,event_type,original_amount,original_currency,destination_account_id,destination_amount,twd_value,source_payload,status"),
       fetchAll(`investment_property_events?select=property_component_id,amount_twd,recovery_class&${filter}`),
       fetchAll(`investment_property_valuation_assumptions?select=id,property_component_id,estimated_sale_value_twd,profit_retention_rate,valuation_inputs&${filter}`),
-      investmentReadRpc("investment_capital_recovery_summary")
+      investmentReadRpc("investment_capital_recovery_summary"),
+      fetchAll(`investment_accounts?select=id,portfolio_id,name,institution,code,status&${filter}`),
+      fetchAll(`investment_stablecoin_settlements?select=transaction_id,cashbook_account_id,currency,amount,fee_included_amount,evidence_reference&${filter}`)
     ]);
     const marketPrices = await fetchLatestMarketPrices(assets, portfolioId);
-    state.data = buildDashboard({ portfolios, assets, transactions, incomeEvents, marketPrices, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents, propertyValuationAssumptions, capitalRecoveryRows });
+    state.data = buildDashboard({ portfolios, assets, transactions, incomeEvents, marketPrices, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents, propertyValuationAssumptions, capitalRecoveryRows, accounts, stablecoinSettlements });
     renderDashboard();
   } catch (error) {
     byId("error-message").textContent = error instanceof Error ? error.message : String(error);
@@ -2059,9 +2075,14 @@ function renderActivity() {
     const holdingAverageLabel = holdingAverageChange
       ? `持倉均價 前 ${holdingAverageChange.before === null ? "—" : perSharePrice(holdingAverageChange.before, row.settlement_currency, asset.asset_class)} → 後 ${perSharePrice(holdingAverageChange.after, row.settlement_currency, asset.asset_class)}`
       : "";
+    const account = state.data.accountsById.get(row.account_id);
+    const settlement = state.data.settlementsByTransactionId.get(row.id);
+    const settlementLabel = settlement
+      ? `${isSell ? "實收" : "實扣"} ${money(settlement.amount, settlement.currency)}${num(settlement.fee_included_amount) ? `（含平台費 ${money(settlement.fee_included_amount, settlement.currency)}）` : ""}`
+      : "";
     item.innerHTML = `
       <span class="transaction-type ${isSell ? "is-sell" : ""}">${escapeHtml(label)}</span>
-      <span class="transaction-copy"><strong>${escapeHtml(asset.symbol || "—")} · ${escapeHtml(asset.name || "未命名標的")}</strong><small>${shortDate(row.trade_date)} · ${escapeHtml(row.settlement_currency)}</small><small class="transaction-costs private-number">手續費 ${money(row.fee_amount || 0, row.settlement_currency)} · 稅 ${money(row.tax_amount || 0, row.settlement_currency)}</small>${holdingAverageLabel ? `<small class="transaction-holding-average private-number">${escapeHtml(holdingAverageLabel)}</small>` : ""}</span>
+      <span class="transaction-copy"><strong>${escapeHtml(asset.symbol || "—")} · ${escapeHtml(asset.name || "未命名標的")}</strong><small>${shortDate(row.trade_date)} · ${escapeHtml(row.settlement_currency)}${account ? ` · ${escapeHtml(account.name)}` : ""}</small><small class="transaction-costs private-number">手續費 ${money(row.fee_amount || 0, row.settlement_currency)} · 稅 ${money(row.tax_amount || 0, row.settlement_currency)}</small>${settlementLabel ? `<small class="transaction-costs private-number">${escapeHtml(settlementLabel)}</small>` : ""}${holdingAverageLabel ? `<small class="transaction-holding-average private-number">${escapeHtml(holdingAverageLabel)}</small>` : ""}</span>
       <span class="transaction-amount"><strong class="private-number">${quantity(row.quantity, asset.quantity_scale)} ${escapeHtml(asset.quantity_unit || "")}</strong><small class="private-number">每股 ${row.unit_price === null ? "無" : perSharePrice(row.unit_price, row.settlement_currency, asset.asset_class)}</small><small class="transaction-gross private-number">${grossLabel} ${money(grossAmount, row.settlement_currency)}</small><small class="transaction-charge-total private-number">費用合計 ${money(charges, row.settlement_currency)}</small><small class="transaction-cashflow private-number">${transactionCashflowLabel(row)}</small></span>`;
     transactionList.append(item);
   }
@@ -2135,6 +2156,12 @@ function renderOverview() {
       </div>
       <div class="allocation-track"><div class="allocation-bar" style="width:${Math.max(0, Math.min(100, pct))}%"></div></div>`;
     groups.append(row);
+  }
+  if (data.stablecoinAllocation.usEquityAttributedTwd > 0 || data.stablecoinAllocation.pendingCount > 0) {
+    const attribution = document.createElement("p");
+    attribution.className = "funding-attribution private-number";
+    attribution.textContent = `穩定幣歷史台幣成本已歸屬美股 ${money(data.stablecoinAllocation.usEquityAttributedTwd)}${data.stablecoinAllocation.pendingCount ? ` · ${data.stablecoinAllocation.pendingCount} 筆待核對成本` : ""}；屬資金配置移轉，沒有增加總投入。`;
+    groups.append(attribution);
   }
 
   renderExposure();

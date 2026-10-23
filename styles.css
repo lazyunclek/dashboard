@@ -256,6 +256,7 @@ input::placeholder { color: #53645a; }
 .asset-group-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .asset-group-name small { color: var(--muted); font: 10px/1 var(--mono); }
 .asset-group-value { text-align: right; font: 700 12px/1 var(--mono); }
+.funding-attribution { margin: 2px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .allocation-track { height: 5px; overflow: hidden; border-radius: 999px; background: rgba(143, 163, 152, 0.12); }
 .allocation-bar { height: 100%; border-radius: inherit; background: var(--accent); box-shadow: 0 0 12px rgba(136, 255, 86, 0.3); }
 .cost-value-card { display: grid; gap: 16px; }

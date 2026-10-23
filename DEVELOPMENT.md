@@ -24,6 +24,8 @@ node tools/sync-public-config.mjs "/absolute/path/to/outputs/investments/data/cl
 
 ## 必做驗證
 
+穩定幣美股變更另執行 `node --test funding-allocation.test.mjs`，並在已登入的手機版核對元大 USD 舊交易、新平台 USDC／USDT 交易明細、平台名稱、實扣／實收、已含費用、隱藏金額模式及歷史成本待核對提示。資料表未授權或缺少時應顯示載入錯誤；不得以元大 USD 金額填補穩定幣數量。快照產生器須能以既有 service-role SELECT 讀取新表；不輸出憑證索引到公開前端。
+
 ```bash
 node tools/check-static-app.mjs
 ```
