@@ -52,7 +52,8 @@ const state = {
     selectedDate: new Date().toISOString().slice(0, 10),
     armedDate: "",
     view: "ledger",
-    editingEvent: null
+    editingEvent: null,
+    originalCurrencyManuallySelected: false
   },
   numbersHidden: window.localStorage.getItem(storageKeys.privacy) === "true",
   loading: false,
@@ -1599,6 +1600,9 @@ function refreshCashbookForm({ rebuildOptions = false } = {}) {
   const isRecovery = mode === "investment_recovery_transfer";
   const isOpening = mode === "opening_balance";
   const selectedAccount = isExpense ? source : isIncome || isOpening ? destination : null;
+  if (!state.cashbook.editingEvent && !state.cashbook.originalCurrencyManuallySelected && !byId("cashbook-original-amount").value && (isExpense || isIncome) && selectedAccount) {
+    byId("cashbook-original-currency").value = selectedAccount.currency;
+  }
   const originalCurrency = byId("cashbook-original-currency").value;
   const crossCurrency = isTransfer && source && destination && source.currency !== destination.currency;
   const differentCurrency = (isExpense || isIncome) && selectedAccount && originalCurrency !== selectedAccount.currency;
@@ -1660,6 +1664,7 @@ function refreshCashbookForm({ rebuildOptions = false } = {}) {
 function openCashbookForm(existing = null, occurredOn = state.cashbook.selectedDate || localDateKey()) {
   if (!state.cashbook.loaded) return;
   state.cashbook.editingEvent = existing;
+  state.cashbook.originalCurrencyManuallySelected = Boolean(existing);
   const form = byId("cashbook-form");
   form.reset();
   const initialMode = ["exchange", "credit_card_payment"].includes(existing?.event_type) ? "transfer" : existing?.event_type || "expense";
@@ -1791,7 +1796,7 @@ function openAccountSheet(account = null) {
   byId("cashbook-account-title").textContent = account ? "帳戶明細與對帳" : "新增帳戶";
   byId("account-name").value = account?.name || ""; byId("account-type").value = account?.account_type || "bank"; byId("account-currency").value = account?.currency || "TWD"; byId("account-institution").value = account?.institution || ""; byId("account-note").value = account?.note || ""; byId("account-opening").value = 0; byId("account-actual-balance").value = isCreditCard ? Math.max(0, -num(account.balance)) : account?.balance ?? "";
   byId("account-reconcile-label").textContent = isCreditCard ? "目前待繳餘額（對帳）" : "目前實際餘額（對帳）";
-  byId("account-reconcile-hint").textContent = isCreditCard ? "請輸入正數；儲存時只會以差額調整信用卡負債。" : "儲存時只會寫入差額調整。";
+  byId("account-reconcile-hint").textContent = isCreditCard ? "請輸入正數；儲存時只會以差額調整信用卡負債。" : `請以 ${account?.currency || "帳戶原幣"} 輸入；儲存時只會寫入差額調整，不需填台幣。`;
   byId("account-actual-balance").min = isCreditCard ? "0" : "";
   byId("account-type-field").hidden = Boolean(account); byId("account-currency-field").hidden = Boolean(account); byId("account-opening-field").hidden = Boolean(account); byId("account-reconcile-field").hidden = !account;
   refreshAccountPaymentSourceOptions(account);
@@ -2711,13 +2716,13 @@ byId("cashbook-form").addEventListener("submit", saveCashbookEvent);
 byId("cashbook-void-button").addEventListener("click", voidCashbookEvent);
 byId("cashbook-event-type").addEventListener("change", () => refreshCashbookForm({ rebuildOptions: true }));
 byId("cashbook-source-account").addEventListener("change", () => {
-  const source = cashbookAccount(byId("cashbook-source-account").value);
-  if (!state.cashbook.editingEvent && byId("cashbook-event-type").value === "expense" && source) {
-    byId("cashbook-original-currency").value = usdEquivalentCurrencies.has(source.currency) ? "TWD" : source.currency;
-  }
   refreshCashbookForm();
 });
-for (const id of ["cashbook-destination-account", "cashbook-category", "cashbook-property-recovery", "cashbook-original-currency", "cashbook-original-amount", "cashbook-settled-amount", "cashbook-received-amount", "cashbook-has-fee", "cashbook-fee-amount"]) {
+byId("cashbook-original-currency").addEventListener("change", () => {
+  state.cashbook.originalCurrencyManuallySelected = true;
+  refreshCashbookForm();
+});
+for (const id of ["cashbook-destination-account", "cashbook-category", "cashbook-property-recovery", "cashbook-original-amount", "cashbook-settled-amount", "cashbook-received-amount", "cashbook-has-fee", "cashbook-fee-amount"]) {
   byId(id).addEventListener("change", () => refreshCashbookForm());
   byId(id).addEventListener("input", () => refreshCashbookForm());
 }

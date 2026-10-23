@@ -24,6 +24,8 @@ node tools/sync-public-config.mjs "/absolute/path/to/outputs/investments/data/cl
 
 ## 必做驗證
 
+外幣帳本操作須核對：選取 USD／USDC／USDT 支出或收入帳戶時，新帳目預設以該帳戶原幣輸入主要金額；使用者手動改選現場幣別後不得被刷新覆蓋。跨幣別消費仍需填寫實際入扣原幣金額。帳戶「目前實際餘額（對帳）」直接輸入帳戶原幣，可使用穩定幣小數精度，不需要台幣數字。
+
 穩定幣美股變更另執行 `node --test funding-allocation.test.mjs`，並在已登入的手機版核對元大 USD 舊交易、新平台 USDC／USDT 交易明細、平台名稱、實扣／實收、已含費用、隱藏金額模式及歷史成本待核對提示。資料表未授權或缺少時應顯示載入錯誤；不得以元大 USD 金額填補穩定幣數量。快照產生器須能以既有 service-role SELECT 讀取新表；不輸出憑證索引到公開前端。
 
 ```bash
