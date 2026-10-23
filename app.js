@@ -1601,7 +1601,8 @@ function refreshCashbookForm({ rebuildOptions = false } = {}) {
   const isOpening = mode === "opening_balance";
   const selectedAccount = isExpense ? source : isIncome || isOpening ? destination : null;
   if (!state.cashbook.editingEvent && !state.cashbook.originalCurrencyManuallySelected && !byId("cashbook-original-amount").value && (isExpense || isIncome) && selectedAccount) {
-    byId("cashbook-original-currency").value = selectedAccount.currency;
+    const cardSpend = isExpense && ["debit_card", "credit_card"].includes(selectedAccount.account_type) && selectedAccount.currency !== "TWD";
+    byId("cashbook-original-currency").value = cardSpend ? "TWD" : selectedAccount.currency;
   }
   const originalCurrency = byId("cashbook-original-currency").value;
   const crossCurrency = isTransfer && source && destination && source.currency !== destination.currency;
@@ -1615,6 +1616,7 @@ function refreshCashbookForm({ rebuildOptions = false } = {}) {
   setCashbookFieldVisible("cashbook-category-field", isExpense || isIncome);
   setCashbookFieldVisible("cashbook-recovery-field", isProperty || (existingProperty && !isIncome));
   setCashbookFieldVisible("cashbook-currency-field", isExpense || isIncome);
+  byId("cashbook-currency-field").parentElement.classList.toggle("with-currency", isExpense || isIncome);
   setCashbookFieldVisible("cashbook-settled-field", Boolean(differentCurrency));
   setCashbookFieldVisible("cashbook-received-field", Boolean(crossCurrency));
   if (isRecovery) byId("cashbook-has-fee").checked = false;
@@ -1623,8 +1625,11 @@ function refreshCashbookForm({ rebuildOptions = false } = {}) {
   byId("cashbook-merchant-label").textContent = isExpense ? "商家／對象" : isIncome ? "收入來源／對象" : "資產／標的（選填）";
   byId("cashbook-source-label").textContent = isExpense ? "付款帳戶" : isFunding ? "資金來源帳戶" : isRecovery ? "資產成本帳戶" : "轉出帳戶";
   byId("cashbook-destination-label").textContent = isIncome ? "入帳帳戶" : isOpening ? "初始化帳戶" : isFunding ? "資產成本帳戶" : isRecovery ? "實際收款帳戶" : "轉入帳戶";
-  byId("cashbook-amount-label").textContent = isFunding ? `投入金額${source ? `（${source.currency}）` : ""}` : isRecovery ? `實際淨收款${source ? `（${source.currency}）` : ""}` : isTransfer ? `轉出金額${source ? `（${source.currency}）` : ""}` : isOpening ? `初始化金額${destination ? `（${destination.currency}）` : ""}` : `${isExpense && originalCurrency === "TWD" && usdEquivalentCurrencies.has(source?.currency) ? "現場消費" : isExpense ? "消費" : "收入"}金額（${originalCurrency}）`;
-  byId("cashbook-settled-label").textContent = `${isExpense ? source?.account_type === "credit_card" ? "信用卡" : "帳戶" : "帳戶"}實際${isExpense ? "扣款" : "入帳"}（${selectedAccount?.currency || ""}）`;
+  byId("cashbook-amount-label").textContent = isFunding ? `投入金額（${source?.currency || "—"}）` : isRecovery ? `實際淨收款（${source?.currency || "—"}）` : isTransfer ? `轉出金額（${source?.currency || "—"}）` : isOpening ? `初始化金額（${destination?.currency || "—"}）` : isExpense ? "消費金額" : "收入金額";
+  byId("cashbook-amount-hint").textContent = differentCurrency
+    ? `以 ${originalCurrency} 記錄${isExpense ? "消費" : "收入"}，另填${isExpense ? "實扣" : "實收"} ${selectedAccount.currency}；不會用 1:1 猜算。`
+    : selectedAccount && (isExpense || isIncome) ? `以 ${selectedAccount.currency} 記錄，帳戶實際${isExpense ? "扣款" : "入帳"}同額。` : "請輸入金額與幣別。";
+  byId("cashbook-settled-label").textContent = `${isExpense && ["debit_card", "credit_card"].includes(source?.account_type) ? "卡片" : "帳戶"}實際${isExpense ? "扣款" : "入帳"}（${selectedAccount?.currency || ""}）`;
   byId("cashbook-received-label").textContent = `轉入實收（${destination?.currency || ""}）`;
 
   const amount = num(byId("cashbook-original-amount").value);

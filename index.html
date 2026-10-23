@@ -394,10 +394,9 @@
             <option value="other_non_recoverable">其他費用／不保證回收</option>
             <option value="unclassified">待分類</option>
           </select></label>
-          <label id="cashbook-currency-field"><span>現場交易幣別</span><select id="cashbook-original-currency">
+          <div class="cashbook-amount-field"><label id="cashbook-amount-label" for="cashbook-original-amount">消費金額</label><div class="cashbook-amount-controls"><input id="cashbook-original-amount" type="number" min="0" step="any" inputmode="decimal" required placeholder="0"><div id="cashbook-currency-field"><select id="cashbook-original-currency" aria-label="消費金額幣別">
             <option value="TWD">TWD</option><option value="USD">USD</option><option value="USDC">USDC</option><option value="USDT">USDT</option>
-          </select></label>
-          <label class="cashbook-amount-field"><span id="cashbook-amount-label">金額（TWD）</span><input id="cashbook-original-amount" type="number" min="0" step="any" inputmode="decimal" required placeholder="0"></label>
+          </select></div></div><small id="cashbook-amount-hint">請輸入消費金額與幣別。</small></div>
           <label id="cashbook-settled-field" hidden><span id="cashbook-settled-label">帳戶實際扣款</span><input id="cashbook-settled-amount" type="number" min="0" step="any" inputmode="decimal"></label>
           <label id="cashbook-received-field" hidden><span id="cashbook-received-label">轉入帳戶實收</span><input id="cashbook-received-amount" type="number" min="0" step="any" inputmode="decimal"></label>
           <label id="cashbook-fee-toggle-field" class="cashbook-check-field"><span>手續費</span><span class="cashbook-check-row"><input id="cashbook-has-fee" type="checkbox"><span>這筆交易另有手續費</span></span></label>
