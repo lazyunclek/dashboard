@@ -1857,8 +1857,8 @@ async function saveCashbookEvent(event) {
   const recovery = propertyRecoveryForKind(propertyKind);
   const status = byId("cashbook-form-status");
   if (!(amount > 0)) return void (status.textContent = "請輸入大於 0 的金額");
-  if (mode === "expense" && (!source || !byId("cashbook-category").value || !(sourceAmount > 0))) return void (status.textContent = "請選擇付款帳戶、支出品類並完成金額");
-  if (mode === "income" && (!destination || !byId("cashbook-category").value || !(destinationAmount > 0))) return void (status.textContent = "請選擇入帳帳戶、收入品類並完成金額");
+  if (mode === "expense" && (!source || !byId("cashbook-category").value)) return void (status.textContent = "請選擇付款帳戶與支出品類");
+  if (mode === "income" && (!destination || !byId("cashbook-category").value)) return void (status.textContent = "請選擇入帳帳戶與收入品類");
   if (mode === "transfer" && (!source || !destination || source.id === destination.id || !(destinationAmount > 0))) return void (status.textContent = "請選擇不同的轉出、轉入帳戶並完成金額");
   if (mode === "investment_funding_transfer" && (!source || !destination || destination.account_type !== "asset_cost" || source.currency !== destination.currency || !byId("cashbook-category").value)) return void (status.textContent = "請選擇同幣別的資金來源與資產成本帳戶");
   if (mode === "investment_recovery_transfer" && (!source || !destination || source.account_type !== "asset_cost" || ["credit_card", "asset_cost", "investment_bridge"].includes(destination.account_type) || source.currency !== destination.currency || !byId("cashbook-category").value || fee !== 0)) return void (status.textContent = "請選擇同幣別的資產成本帳戶與實際收款帳戶，並直接填寫已扣費稅的淨收款");
