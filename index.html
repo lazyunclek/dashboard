@@ -22,9 +22,9 @@
         <span>QUANT LAB</span>
       </div>
       <div class="login-card">
-        <p class="eyebrow">PRIVATE / PERSONAL</p>
+        <p class="eyebrow">個人帳本</p>
         <h1 id="login-title">投資儀表板</h1>
-        <p class="login-copy">登入後查看投資，並在手機上新增或修改自己的日常帳目。每筆資料都由 Supabase 權限隔離。</p>
+        <p class="login-copy">查看投資與日常帳目。登入後即可記帳。</p>
         <form id="login-form" autocomplete="on">
           <label>
             <span>Email</span>
@@ -42,13 +42,13 @@
           <p class="form-status" id="login-status" role="status"></p>
         </form>
       </div>
-      <p class="security-note">Supabase Auth + RLS · GitHub Pages 不保存投資快照</p>
+      <p class="security-note">僅供本人使用 · 資料由帳號權限保護</p>
     </section>
 
     <section class="dashboard-view" id="dashboard-view" hidden>
       <header class="topbar">
         <div>
-          <p class="eyebrow" id="dashboard-eyebrow">INVESTMENTS / SUPABASE</p>
+          <p class="eyebrow" id="dashboard-eyebrow">個人投資</p>
           <h1 id="dashboard-title">投資總覽</h1>
         </div>
         <div class="topbar-actions">
@@ -131,7 +131,7 @@
         <section class="content-card cost-value-card" aria-labelledby="cost-value-title">
           <div class="section-head">
             <div>
-              <p class="eyebrow">COST / VALUE</p>
+              <p class="eyebrow">資產比較</p>
               <h2 id="cost-value-title">成本與目前價值</h2>
             </div>
             <small>TWD</small>
@@ -142,7 +142,7 @@
 
         <section class="content-card overview-treemap-card" aria-labelledby="overview-treemap-title">
           <div class="section-head">
-            <div><p class="eyebrow">PORTFOLIO MAP</p><h2 id="overview-treemap-title">總資產持有比例</h2></div>
+            <div><p class="eyebrow">持有分布</p><h2 id="overview-treemap-title">總資產持有比例</h2></div>
             <div class="segmented-control" role="group" aria-label="比例圖範圍">
               <button type="button" data-overview-scope="all" class="is-active">全部資產</button>
               <button type="button" data-overview-scope="holdings">投資持倉</button>
@@ -176,7 +176,7 @@
         <section class="content-card">
           <div class="section-head">
             <div>
-              <p class="eyebrow">ALLOCATION</p>
+              <p class="eyebrow">資產配置</p>
               <h2>資產全貌</h2>
             </div>
             <small>以目前 TWD 價值</small>
@@ -187,7 +187,7 @@
         <section class="content-card exposure-card" aria-labelledby="exposure-title">
           <div class="section-head exposure-head">
             <div>
-              <p class="eyebrow">INDUSTRY EXPOSURE</p>
+              <p class="eyebrow">產業分布</p>
               <h2 id="exposure-title">產業與主題配置</h2>
             </div>
             <div class="segmented-control" id="exposure-levels" aria-label="產業分類層級">

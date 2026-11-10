@@ -716,6 +716,66 @@ body.numbers-hidden .private-number { filter: blur(8px); user-select: none; }
   .calendar-nav-button { padding-inline: 9px; }
 }
 
+/* Mobile reading hierarchy: quieter surfaces, clearer figures, fewer repeated boxes. */
+@media (max-width: 679px) {
+  :root {
+    --bg: #101714;
+    --bg-deep: #101714;
+    --panel: #18211c;
+    --panel-soft: #1c2720;
+    --line: rgba(214, 225, 211, 0.11);
+    --line-strong: rgba(214, 225, 211, 0.22);
+    --text: #f0f1e9;
+    --muted: #a9b5a7;
+    --accent: #c8dc9d;
+    --accent-soft: rgba(200, 220, 157, 0.11);
+    --sans: -apple-system, BlinkMacSystemFont, "Noto Sans TC", "Segoe UI", sans-serif;
+  }
+  body { background: var(--bg); }
+  .ambient { display: none; }
+  .app-shell { padding-top: max(28px, env(safe-area-inset-top)); }
+  .dashboard-view { gap: 22px; }
+  .topbar { align-items: center; padding: 0 2px 2px; }
+  .topbar h1 { font-size: 30px; line-height: 1.1; letter-spacing: -0.045em; }
+  .eyebrow { color: var(--muted); font-size: 9px; font-weight: 600; letter-spacing: 0.12em; }
+  .status-card, .metric-card, .content-card, .hero-metric, .loading-card, .error-card {
+    box-shadow: none;
+  }
+  .status-card { padding: 13px 2px 15px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
+  .live-dot { background: #96bb88; box-shadow: none; }
+  .hero-metric { padding: 24px 21px 26px; border: 0; border-radius: 16px; background: #25372b; }
+  .hero-metric > span, .metric-card > span { font-size: 12px; }
+  .hero-metric strong { margin-top: 13px; font-size: clamp(29px, 8vw, 42px); font-variant-numeric: tabular-nums; }
+  .metric-grid { gap: 0 18px; }
+  .metric-card { padding: 18px 2px 17px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
+  .metric-card strong { font-variant-numeric: tabular-nums; }
+  .overview-metric-grid .metric-card:not(.metric-card-wide) > small { font-size: 10px; line-height: 1.45; }
+  .content-card { padding: 21px 18px; border-color: var(--line); border-radius: 14px; }
+  .section-head h2 { font-size: 18px; }
+  .tabbar { border-top-color: var(--line-strong); background: rgba(16, 23, 20, 0.96); }
+  .tab.is-active { color: var(--text); }
+  .tab.is-active::after { content: ""; display: block; width: 16px; height: 2px; margin: 5px auto 0; border-radius: 2px; background: var(--accent); }
+  .tab-create span { color: #172019; }
+  .primary-button { color: #172019; }
+  .login-view { gap: 12px; align-content: center; }
+  .login-brand { padding-inline: 4px; color: var(--muted); letter-spacing: 0.11em; }
+  .brand-mark { width: 31px; height: 31px; border-radius: 7px; background: transparent; }
+  .login-card { padding: 18px 4px 14px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  .login-card .eyebrow { display: none; }
+  .login-card h1 { margin-top: 0; font-size: 34px; }
+  .login-copy { margin: 11px 0 29px; font-size: 14px; line-height: 1.65; }
+  input::placeholder { color: #8a9b8c; }
+  .security-note { color: var(--muted); font: 11px/1.5 var(--sans); }
+  .section-head .eyebrow { display: none; }
+  .section-head h2 { margin-top: 0; }
+  .topbar .eyebrow { margin-bottom: 7px; }
+  .tab-create small, .metric-detail-button, .segmented-control button,
+  .overview-treemap-markets button, .overview-treemap-zoom button { font-size: 11px; }
+  .status-meta, .status-actions, .metric-card small { font-size: 11px; }
+  button { transition: background-color 180ms ease, color 180ms ease, transform 180ms ease; }
+  button:active { transform: translateY(1px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }

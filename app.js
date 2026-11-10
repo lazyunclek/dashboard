@@ -2477,10 +2477,10 @@ function renderDashboard() {
 function showTab(tabName) {
   state.activeTab = tabName;
   const tabHeadings = {
-    overview: ["INVESTMENTS / SUPABASE", "投資總覽"],
-    positions: ["PORTFOLIO", "持倉"],
-    cashbook: ["DAILY CASHBOOK", "日常記帳"],
-    activity: ["INVESTMENT LEDGER", "投資帳本"],
+    overview: ["個人投資", "投資總覽"],
+    positions: ["投資部位", "持倉"],
+    cashbook: ["日常帳本", "日常記帳"],
+    activity: ["交易紀錄", "投資帳本"],
   };
   const [eyebrow, title] = tabHeadings[tabName] || tabHeadings.overview;
   byId("dashboard-eyebrow").textContent = eyebrow;
