@@ -974,8 +974,8 @@ function positionCard(position) {
   const news = state.data.newsByAsset?.get(position.id) || [];
   const report = position.assetClass === "tw_equity" ? state.data.reportByAsset?.get(position.id) : null;
   const newsContent = news.length
-    ? `<ol class="position-news-list">${news.map((item) => `<li><a href="${escapeHtml(item.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.headline)}</a><small>${escapeHtml(item.source_name)} · 收錄 ${escapeHtml(dateTime(item.seen_at))}</small></li>`).join("")}</ol>`
-    : `<p class="position-news-empty">${state.data.newsStatus === "unavailable" ? "新聞暫時無法讀取" : "最近三天沒有收錄新聞"}</p>`;
+    ? `<ol class="position-news-list">${news.map((item) => `<li><a href="${escapeHtml(item.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.headline)}</a><small>${escapeHtml(item.source_name)} · 發布 ${escapeHtml(dateTime(item.seen_at))}</small></li>`).join("")}</ol>`
+    : `<p class="position-news-empty">${state.data.newsStatus === "unavailable" ? "新聞暫時無法讀取" : "最近三天沒有新聞"}</p>`;
   const reportContent = report?.published_on
     ? `<p class="position-report">最新財報：<a href="${escapeHtml(report.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(report.report_type)} · ${escapeHtml(report.published_on)}</a></p>`
     : "";
@@ -1014,7 +1014,7 @@ function positionCard(position) {
     <div class="position-ledger-actions" aria-label="${escapeHtml(position.displaySymbol)} 成交紀錄篩選">
       ${recoveryAction}${ledgerActions}
     </div>
-    ${position.assetClass === "crypto" ? "" : `<div class="position-news"><button class="position-news-toggle" type="button" aria-expanded="false">最新新聞${news.length ? ` · ${news.length}` : ""}</button><div class="position-news-content" hidden><p>近三天收錄，每日更新；同一事件僅保留一則標題重點。</p>${reportContent}${newsContent}</div></div>`}`;
+    ${position.assetClass === "crypto" ? "" : `<div class="position-news"><button class="position-news-toggle" type="button" aria-expanded="false">最新新聞${news.length ? ` · ${news.length}` : ""}</button><div class="position-news-content" hidden><p>近三天新聞，每日更新；同一事件僅保留一則標題重點。</p>${reportContent}${newsContent}</div></div>`}`;
   const newsButton = details.querySelector(".position-news-toggle");
   const newsPanel = details.querySelector(".position-news-content");
   newsButton?.addEventListener("click", () => {
