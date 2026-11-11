@@ -873,6 +873,18 @@ async function loadDashboard() {
     ]);
     const marketPrices = await fetchLatestMarketPrices(assets, portfolioId);
     state.data = buildDashboard({ portfolios, assets, transactions, incomeEvents, marketPrices, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents, propertyValuationAssumptions, capitalRecoveryRows, accounts, stablecoinSettlements });
+    const [newsResult, reportResult] = await Promise.allSettled([
+      fetchAll(`investment_asset_news?select=asset_id,event_key,headline,source_name,source_url,seen_at&${filter}&seen_at=gte.${encodeURIComponent(new Date(Date.now() - 3 * 86400000).toISOString())}&order=seen_at.desc`),
+      fetchAll(`investment_asset_report_latest?select=asset_id,report_type,report_period,published_on,source_url,checked_at&${filter}`)
+    ]);
+    state.data.newsByAsset = new Map();
+    for (const item of newsResult.status === "fulfilled" ? newsResult.value : []) {
+      const rows = state.data.newsByAsset.get(item.asset_id) || [];
+      rows.push(item);
+      state.data.newsByAsset.set(item.asset_id, rows);
+    }
+    state.data.reportByAsset = new Map((reportResult.status === "fulfilled" ? reportResult.value : []).map((item) => [item.asset_id, item]));
+    state.data.newsStatus = newsResult.status === "fulfilled" ? "ready" : "unavailable";
     renderDashboard();
   } catch (error) {
     byId("error-message").textContent = error instanceof Error ? error.message : String(error);
@@ -959,6 +971,14 @@ function positionCard(position) {
   const recoveryAction = position.capitalRecovery?.status !== "empty"
     ? `<button class="position-ledger-button" type="button" data-capital-recovery-asset-id="${escapeHtml(position.id)}">本金回收歷程</button>`
     : "";
+  const news = state.data.newsByAsset?.get(position.id) || [];
+  const report = position.assetClass === "tw_equity" ? state.data.reportByAsset?.get(position.id) : null;
+  const newsContent = news.length
+    ? `<ol class="position-news-list">${news.map((item) => `<li><a href="${escapeHtml(item.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.headline)}</a><small>${escapeHtml(item.source_name)} · 收錄 ${escapeHtml(dateTime(item.seen_at))}</small></li>`).join("")}</ol>`
+    : `<p class="position-news-empty">${state.data.newsStatus === "unavailable" ? "新聞暫時無法讀取" : "最近三天沒有收錄新聞"}</p>`;
+  const reportContent = report?.published_on
+    ? `<p class="position-report">最新財報：<a href="${escapeHtml(report.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(report.report_type)} · ${escapeHtml(report.published_on)}</a></p>`
+    : "";
   details.innerHTML = `
     <summary>
       <span class="position-identity">
@@ -993,7 +1013,14 @@ function positionCard(position) {
     ${recoveryStatus ? `<div class="capital-recovery-status"><span>${escapeHtml(recoveryStatus.label)}</span><strong>${escapeHtml(recoveryStatus.title)}</strong>${recoveryStatus.detail ? `<b class="private-number">${escapeHtml(recoveryStatus.detail)}</b>` : ""}</div>` : ""}
     <div class="position-ledger-actions" aria-label="${escapeHtml(position.displaySymbol)} 成交紀錄篩選">
       ${recoveryAction}${ledgerActions}
-    </div>`;
+    </div>
+    ${position.assetClass === "crypto" ? "" : `<div class="position-news"><button class="position-news-toggle" type="button" aria-expanded="false">最新新聞${news.length ? ` · ${news.length}` : ""}</button><div class="position-news-content" hidden><p>近三天收錄，每日更新；同一事件僅保留一則標題重點。</p>${reportContent}${newsContent}</div></div>`}`;
+  const newsButton = details.querySelector(".position-news-toggle");
+  const newsPanel = details.querySelector(".position-news-content");
+  newsButton?.addEventListener("click", () => {
+    newsPanel.hidden = !newsPanel.hidden;
+    newsButton.setAttribute("aria-expanded", String(!newsPanel.hidden));
+  });
   details.addEventListener("toggle", () => {
     if (details.open) state.positionExpandedIds.add(position.id);
     else state.positionExpandedIds.delete(position.id);
