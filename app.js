@@ -924,8 +924,10 @@ function capitalRecoveryStatus(history) {
 }
 
 function positionCard(position) {
+  const card = document.createElement("div");
+  card.className = "position-card";
   const details = document.createElement("details");
-  details.className = "position-card";
+  card.append(details);
   details.open = state.positionExpandedIds.has(position.id);
   const isClosed = Boolean(position.isClosed);
   const usesUsd = state.positionCurrency === "USD" && supportsDollarDisplay(position);
@@ -1013,10 +1015,15 @@ function positionCard(position) {
     ${recoveryStatus ? `<div class="capital-recovery-status"><span>${escapeHtml(recoveryStatus.label)}</span><strong>${escapeHtml(recoveryStatus.title)}</strong>${recoveryStatus.detail ? `<b class="private-number">${escapeHtml(recoveryStatus.detail)}</b>` : ""}</div>` : ""}
     <div class="position-ledger-actions" aria-label="${escapeHtml(position.displaySymbol)} 成交紀錄篩選">
       ${recoveryAction}${ledgerActions}
-    </div>
-    ${position.assetClass === "crypto" ? "" : `<div class="position-news"><button class="position-news-toggle" type="button" aria-expanded="false">最新新聞${news.length ? ` · ${news.length}` : ""}</button><div class="position-news-content" hidden><p>近三天新聞，每日更新；同一事件僅保留一則標題重點。</p>${reportContent}${newsContent}</div></div>`}`;
-  const newsButton = details.querySelector(".position-news-toggle");
-  const newsPanel = details.querySelector(".position-news-content");
+    </div>`;
+  if (position.assetClass !== "crypto") {
+    const newsSection = document.createElement("div");
+    newsSection.className = "position-news";
+    newsSection.innerHTML = `<button class="position-news-toggle" type="button" aria-expanded="false">最新新聞${news.length ? ` · ${news.length}` : ""}</button><div class="position-news-content" hidden><p>近三天新聞，每日更新；同一事件僅保留一則標題重點。</p>${reportContent}${newsContent}</div>`;
+    card.append(newsSection);
+  }
+  const newsButton = card.querySelector(".position-news-toggle");
+  const newsPanel = card.querySelector(".position-news-content");
   newsButton?.addEventListener("click", () => {
     newsPanel.hidden = !newsPanel.hidden;
     newsButton.setAttribute("aria-expanded", String(!newsPanel.hidden));
@@ -1025,7 +1032,7 @@ function positionCard(position) {
     if (details.open) state.positionExpandedIds.add(position.id);
     else state.positionExpandedIds.delete(position.id);
   });
-  return details;
+  return card;
 }
 
 function recoveryCycleLabel(cycle) {
