@@ -923,6 +923,73 @@ function capitalRecoveryStatus(history) {
   return { label: "回本紀錄", title: "已清倉", detail: "未保留零成本持倉" };
 }
 
+function buyBubbleChart(position, transactions) {
+  const buys = transactions.filter((row) => row.transaction_type === "buy" && row.details?.event_role !== "asset_fee")
+    .map((row) => {
+      const shares = num(row.quantity);
+      const price = num(row.unit_price) > 0 ? num(row.unit_price) : shares > 0 ? num(row.gross_amount) / shares : 0;
+      return { date: String(row.trade_date || ""), shares, price, id: String(row.id || "") };
+    }).filter((row) => row.shares > 0 && row.price > 0 && /^\d{4}-\d{2}-\d{2}/.test(row.date))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  if (!buys.length) return "";
+
+  const totalShares = buys.reduce((sum, row) => sum + row.shares, 0);
+  const first = buys[0];
+  const last = buys.at(-1);
+  const average = num(position.buyAveragePrice) > 0
+    ? num(position.buyAveragePrice)
+    : buys.reduce((sum, row) => sum + row.price * row.shares, 0) / totalShares;
+  const change = (last.price / first.price - 1) * 100;
+  const priorMedian = (index) => {
+    const values = buys.slice(0, index).map((row) => row.shares).sort((a, b) => a - b);
+    return values[Math.floor(values.length / 2)] || 0;
+  };
+  const addIndex = buys.findIndex((row, index) => index >= 2 && row.shares / totalShares >= 0.12 && row.shares >= 2 * priorMedian(index));
+  const width = Math.max(420, 95 + buys.length * 43);
+  const height = 272;
+  const left = 82;
+  const right = width - 25;
+  const top = 25;
+  const bottom = 211;
+  const prices = buys.map((row) => row.price);
+  const low = Math.min(...prices);
+  const high = Math.max(...prices);
+  const span = Math.max(high - low, high * 0.12, 1);
+  const domainLow = Math.max(0, low - span * 0.18);
+  const domainHigh = high + span * 0.18;
+  const x = (index) => buys.length === 1 ? (left + right) / 2 : left + index * (right - left) / (buys.length - 1);
+  const y = (price) => bottom - (price - domainLow) / (domainHigh - domainLow) * (bottom - top);
+  const formatPrice = (price) => {
+    if (price < 1 && position.quoteCurrency !== "TWD") {
+      const digits = price < 0.01 ? 6 : 4;
+      return `${position.quoteCurrency} ${price.toFixed(digits)}`;
+    }
+    return perSharePrice(price, position.quoteCurrency, position.assetClass);
+  };
+  const tickStep = 10 ** Math.floor(Math.log10(Math.max((high - low) / 2, 0.000001)));
+  const tickValues = [...new Set([low, (low + high) / 2, high].map((value) => Math.round(value / tickStep) * tickStep))];
+  const grid = tickValues.map((value) => `<g><line x1="${left}" x2="${right}" y1="${y(value).toFixed(1)}" y2="${y(value).toFixed(1)}" stroke="#52667c" stroke-dasharray="4 7" opacity=".72"/><text x="${left - 10}" y="${(y(value) + 4).toFixed(1)}" text-anchor="end" fill="#a5b6ca" font-size="11">${escapeHtml(formatPrice(value))}</text></g>`).join("");
+  const averageLine = `<line x1="${left}" x2="${right}" y1="${y(average).toFixed(1)}" y2="${y(average).toFixed(1)}" stroke="#d1a05a" stroke-dasharray="6 5"/><text x="${right}" y="${(y(average) - 8).toFixed(1)}" text-anchor="end" fill="#e5bc80" font-size="11">均價 ${escapeHtml(formatPrice(average))}</text>`;
+  const maxShares = Math.max(...buys.map((row) => row.shares));
+  const bubbles = buys.map((row, index) => {
+    const radius = Math.max(7, Math.sqrt(row.shares / maxShares) * 25);
+    const fill = addIndex >= 0 && index >= addIndex ? "#d3a057" : "#61a9c1";
+    const sharePercent = (row.shares / totalShares * 100).toFixed(1);
+    return `<circle class="buy-bubble-dot" tabindex="0" role="button" aria-label="${escapeHtml(`${row.date} 買入 ${formatPrice(row.price)}，數量 ${quantity(row.shares, position.quantityScale)}，占比 ${sharePercent}%`)}" data-date="${escapeHtml(row.date)}" data-price="${escapeHtml(formatPrice(row.price))}" data-shares="${escapeHtml(quantity(row.shares, position.quantityScale))}" data-share="${sharePercent}" cx="${x(index).toFixed(1)}" cy="${y(row.price).toFixed(1)}" r="${radius.toFixed(1)}" fill="${fill}" fill-opacity=".9" stroke="#c9d9e4" stroke-width="1.3"/>`;
+  }).join("");
+  const dateIndexes = [...new Set([0, Math.round((buys.length - 1) / 3), Math.round((buys.length - 1) * 2 / 3), buys.length - 1])];
+  const dateLabels = dateIndexes.map((index) => `<text x="${x(index).toFixed(1)}" y="251" text-anchor="middle" fill="#aebed0" font-size="11">${escapeHtml(buys[index].date.slice(5).replace("-", "/"))}</text>`).join("");
+  const highlightIndexes = [...new Set([0, addIndex, buys.length - 1].filter((index) => index >= 0))];
+  const highlights = highlightIndexes.map((index) => `<text x="${x(index).toFixed(1)}" y="${Math.max(18, y(buys[index].price) - 29).toFixed(1)}" text-anchor="middle" fill="${addIndex >= 0 && index >= addIndex ? "#efc381" : "#eef5f9"}" font-size="12" font-weight="700">${escapeHtml(Number(buys[index].price.toFixed(buys[index].price < 1 ? 6 : 2)).toString())}</text>`).join("");
+  return `<section class="buy-bubble" aria-label="${escapeHtml(position.displaySymbol)} 買入點位與加倉比例">
+    <div class="buy-bubble-heading"><span>買入點位 × 加倉比例</span><small>${buys.length} 筆買入</small></div>
+    <div class="buy-bubble-stats"><span><small>首次買入</small><strong class="private-number">${escapeHtml(formatPrice(first.price))}</strong></span><span><small>最後買入</small><strong class="private-number">${escapeHtml(formatPrice(last.price))}</strong></span><span><small>點位變化</small><strong class="private-number ${change < 0 ? "is-negative" : "is-positive"}">${change < 0 ? "−" : "+"}${Math.abs(change).toFixed(1)}%</strong></span></div>
+    <div class="buy-bubble-scroll" tabindex="0" aria-label="買入圖表，可左右捲動"><svg class="buy-bubble-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="group" aria-label="${escapeHtml(`${position.displaySymbol} 共 ${buys.length} 筆買入；首次 ${formatPrice(first.price)}，最後 ${formatPrice(last.price)}，平均 ${formatPrice(average)}`)}"><g class="buy-bubble-plot private-number">${grid}${averageLine}${bubbles}${highlights}</g>${dateLabels}</svg></div>
+    <p class="buy-bubble-selected private-number" aria-live="polite">點選泡泡查看單筆買入</p>
+    <p class="buy-bubble-caption">依成交時間等距排列 · 圓面積代表每筆買入數量${addIndex >= 0 ? " · 金色為明顯加倉後的交易" : ""}</p>
+  </section>`;
+}
+
 function positionCard(position) {
   const card = document.createElement("div");
   card.className = "position-card";
@@ -962,6 +1029,7 @@ function positionCard(position) {
     ? `<small class="position-detail-note private-number">歷來淨投入 ${money(lifetimeNetCapital, displayCurrency)}</small>`
     : "";
   const ledgerTransactions = state.data.transactions.filter((row) => row.asset_id === position.id && row.details?.event_role !== "asset_fee");
+  const bubbleChart = buyBubbleChart(position, ledgerTransactions);
   const buyCount = ledgerTransactions.filter((row) => row.transaction_type === "buy").length;
   const sellCount = ledgerTransactions.filter((row) => row.transaction_type === "sell").length;
   const ledgerActions = [
@@ -1024,10 +1092,21 @@ function positionCard(position) {
       <span class="position-detail"><span>主題</span><strong>${escapeHtml(position.subTheme)}</strong></span>
       <span class="position-detail"><span>行情時間</span><strong>${dateTime(position.marketPriceAt)}</strong></span>
     </div>
+    ${bubbleChart}
     ${recoveryStatus ? `<div class="capital-recovery-status"><span>${escapeHtml(recoveryStatus.label)}</span><strong>${escapeHtml(recoveryStatus.title)}</strong>${recoveryStatus.detail ? `<b class="private-number">${escapeHtml(recoveryStatus.detail)}</b>` : ""}</div>` : ""}
     <div class="position-ledger-actions" aria-label="${escapeHtml(position.displaySymbol)} 成交紀錄篩選">
       ${recoveryAction}${ledgerActions}
     </div>`;
+  const bubbleSelected = details.querySelector(".buy-bubble-selected");
+  details.querySelectorAll(".buy-bubble-dot").forEach((dot) => {
+    const showTrade = () => {
+      bubbleSelected.textContent = `${dot.dataset.date} · ${dot.dataset.price} · 買入 ${dot.dataset.shares} ${position.quantityUnit || ""} · 占 ${dot.dataset.share}%`;
+      details.querySelectorAll(".buy-bubble-dot.is-selected").forEach((item) => item.classList.remove("is-selected"));
+      dot.classList.add("is-selected");
+    };
+    dot.addEventListener("click", showTrade);
+    dot.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); showTrade(); } });
+  });
   if (position.assetClass !== "crypto") {
     const newsSection = document.createElement("div");
     newsSection.className = "position-news";
