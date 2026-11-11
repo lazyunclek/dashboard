@@ -874,7 +874,7 @@ async function loadDashboard() {
     const marketPrices = await fetchLatestMarketPrices(assets, portfolioId);
     state.data = buildDashboard({ portfolios, assets, transactions, incomeEvents, marketPrices, components, gridRecords, cashbookBalances, cashbookEvents, propertyEvents, propertyValuationAssumptions, capitalRecoveryRows, accounts, stablecoinSettlements });
     const [newsResult, reportResult] = await Promise.allSettled([
-      fetchAll(`investment_asset_news?select=asset_id,event_key,headline,source_name,source_url,seen_at&${filter}&seen_at=gte.${encodeURIComponent(new Date(Date.now() - 3 * 86400000).toISOString())}&order=seen_at.desc`),
+      fetchAll(`investment_asset_news?select=asset_id,event_key,headline,summary_text,source_name,source_url,seen_at&${filter}&seen_at=gte.${encodeURIComponent(new Date(Date.now() - 3 * 86400000).toISOString())}&order=seen_at.desc`),
       fetchAll(`investment_asset_report_latest?select=asset_id,report_type,report_period,published_on,source_url,checked_at&${filter}`)
     ]);
     state.data.newsByAsset = new Map();
@@ -973,11 +973,23 @@ function positionCard(position) {
   const recoveryAction = position.capitalRecovery?.status !== "empty"
     ? `<button class="position-ledger-button" type="button" data-capital-recovery-asset-id="${escapeHtml(position.id)}">本金回收歷程</button>`
     : "";
-  const news = state.data.newsByAsset?.get(position.id) || [];
+  const topicOf = (value) => {
+    if (/股利|配息|股息|財報|營收|獲利|每股盈餘|法說|dividend|earnings|revenue|profit|guidance/i.test(value)) return "財報與股利";
+    if (/投資|認購|入股|併購|investment|acquire|stake/i.test(value)) return "公司決策";
+    if (/股價|漲|跌|ADR|股市|shares|stock price/i.test(value)) return "市場反應";
+    return "其他";
+  };
+  const newsByTopic = new Map();
+  for (const item of state.data.newsByAsset?.get(position.id) || []) {
+    if (!item.summary_text || /\.{2,}|…/.test(item.summary_text)) continue;
+    const topic = topicOf(item.summary_text);
+    if (!newsByTopic.has(topic)) newsByTopic.set(topic, item);
+  }
+  const news = ["財報與股利", "公司決策", "市場反應", "其他"].flatMap((topic) => newsByTopic.has(topic) ? [{ ...newsByTopic.get(topic), topic }] : []);
   const report = position.assetClass === "tw_equity" ? state.data.reportByAsset?.get(position.id) : null;
   const newsContent = news.length
-    ? `<ol class="position-news-list">${news.map((item) => `<li><a href="${escapeHtml(item.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.headline)}</a><small>${escapeHtml(item.source_name)} · 發布 ${escapeHtml(dateTime(item.seen_at))}</small></li>`).join("")}</ol>`
-    : `<p class="position-news-empty">${state.data.newsStatus === "unavailable" ? "新聞暫時無法讀取" : "最近三天沒有新聞"}</p>`;
+    ? `<ul class="position-news-list">${news.map((item) => `<li><b class="position-news-topic">${escapeHtml(item.topic)}</b>${escapeHtml(item.summary_text)}<small><a href="${escapeHtml(item.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.source_name)} · ${escapeHtml(dateTime(item.seen_at))} ↗</a></small></li>`).join("")}</ul>`
+    : `<p class="position-news-empty">${state.data.newsStatus === "unavailable" ? "新聞摘要暫時無法讀取" : "最近三天沒有完成的新聞摘要"}</p>`;
   const reportContent = report?.published_on
     ? `<p class="position-report">最新財報：<a href="${escapeHtml(report.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(report.report_type)} · ${escapeHtml(report.published_on)}</a></p>`
     : "";
@@ -1019,7 +1031,7 @@ function positionCard(position) {
   if (position.assetClass !== "crypto") {
     const newsSection = document.createElement("div");
     newsSection.className = "position-news";
-    newsSection.innerHTML = `<button class="position-news-toggle" type="button" aria-expanded="false">最新新聞${news.length ? ` · ${news.length}` : ""}</button><div class="position-news-content" hidden><p>近三天新聞，每日更新；同一事件僅保留一則標題重點。</p>${reportContent}${newsContent}</div>`;
+    newsSection.innerHTML = `<button class="position-news-toggle" type="button" aria-expanded="false">新聞重點${news.length ? ` · ${news.length}` : ""}</button><div class="position-news-content" hidden><p>近三天來源摘要，按事件整理；點來源可看原文。</p>${reportContent}${newsContent}</div>`;
     card.append(newsSection);
   }
   const newsButton = card.querySelector(".position-news-toggle");

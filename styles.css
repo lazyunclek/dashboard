@@ -460,6 +460,7 @@ input::placeholder { color: #53645a; }
 .position-news-list { display: grid; gap: 13px; margin: 0; padding-left: 20px; }
 .position-news-list li { padding-left: 2px; font-size: 12px; line-height: 1.5; }
 .position-news-list small { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
+.position-news-topic { display: block; margin-bottom: 3px; color: var(--accent); font-size: 10px; font-weight: 700; }
 .empty-state { padding: 32px 15px; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); text-align: center; font-size: 12px; }
 
 .ledger-tools { display: flex; gap: 8px; }
