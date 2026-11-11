@@ -461,26 +461,24 @@ input::placeholder { color: #53645a; }
 .position-news-list li { padding-left: 2px; font-size: 12px; line-height: 1.5; }
 .position-news-list small { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
 .position-news-topic { display: block; margin-bottom: 3px; color: var(--accent); font-size: 10px; font-weight: 700; }
-.buy-bubble { padding: 17px 0 14px; border-top: 1px solid var(--line); background: #0e1521; }
-.buy-bubble-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 15px; color: #e5e9ef; font-size: 13px; font-weight: 700; }
-.buy-bubble-heading small { color: #aab8ca; font-size: 10px; font-weight: 500; white-space: nowrap; }
+.buy-bubble { padding: 17px 0 14px; border-top: 1px solid var(--line); background: #0c1911; }
+.buy-bubble-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 15px; color: var(--text); font-size: 13px; font-weight: 700; }
+.buy-bubble-heading small { color: var(--muted); font-size: 10px; font-weight: 500; white-space: nowrap; }
 .buy-bubble-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; padding: 0 15px; }
 .buy-bubble-stats span { display: grid; min-width: 0; gap: 6px; }
-.buy-bubble-stats small { color: #9eacbe; font-size: 10px; white-space: nowrap; }
-.buy-bubble-stats strong { overflow-wrap: anywhere; color: #e5e9ef; font: 700 14px/1.25 var(--mono); }
-.buy-bubble-stats strong.is-negative { color: #ef9296; }
-.buy-bubble-stats strong.is-positive { color: #9ecfba; }
-.buy-bubble-scroll { max-width: 100%; margin-top: 12px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-inline: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
-.buy-bubble-scroll::-webkit-scrollbar { height: 4px; }
-.buy-bubble-scroll::-webkit-scrollbar-track { background: transparent; }
-.buy-bubble-scroll::-webkit-scrollbar-thumb { border-radius: 4px; background: #52667c; }
+.buy-bubble-stats small { color: var(--muted); font-size: 10px; white-space: nowrap; }
+.buy-bubble-stats strong { overflow-wrap: anywhere; color: var(--text); font: 700 14px/1.25 var(--mono); }
+.buy-bubble-stats strong.is-negative { color: var(--negative); }
+.buy-bubble-stats strong.is-positive { color: var(--positive); }
+.buy-bubble-scroll { max-width: 100%; margin-top: 12px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-inline: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.buy-bubble-scroll::-webkit-scrollbar { display: none; }
 .buy-bubble-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .buy-bubble-svg { display: block; max-width: none; font-family: var(--mono); }
 .buy-bubble-dot { cursor: pointer; touch-action: manipulation; }
-.buy-bubble-dot:focus-visible, .buy-bubble-dot.is-selected { stroke: #f7f8f5; stroke-width: 3; }
+.buy-bubble-dot:focus-visible, .buy-bubble-dot.is-selected { stroke: var(--text); stroke-width: 3; }
 .buy-bubble-dot:active { opacity: .7; }
-.buy-bubble-selected { min-height: 16px; margin: -2px 0 7px; padding: 0 15px; color: #e7bf83; font-size: 10px; line-height: 1.5; }
-.buy-bubble-caption { margin: 0; padding: 0 15px; color: #9eacbe; font-size: 10px; line-height: 1.5; }
+.buy-bubble-selected { min-height: 16px; margin: -2px 0 7px; padding: 0 15px; color: #c6dda9; font-size: 10px; line-height: 1.5; }
+.buy-bubble-caption { margin: 0; padding: 0 15px; color: var(--muted); font-size: 10px; line-height: 1.5; }
 body.numbers-hidden .buy-bubble-plot { pointer-events: none; }
 .empty-state { padding: 32px 15px; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); text-align: center; font-size: 12px; }
 

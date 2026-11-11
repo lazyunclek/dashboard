@@ -952,8 +952,10 @@ function buyBubbleChart(position, transactions) {
   const top = 25;
   const bottom = 211;
   const prices = buys.map((row) => row.price);
-  const low = Math.min(...prices);
-  const high = Math.max(...prices);
+  const latestPrice = num(position.marketPrice) > 0 && (!position.marketPriceCurrency || position.marketPriceCurrency === position.quoteCurrency)
+    ? num(position.marketPrice) : null;
+  const low = Math.min(...prices, ...(latestPrice === null ? [] : [latestPrice]));
+  const high = Math.max(...prices, ...(latestPrice === null ? [] : [latestPrice]));
   const span = Math.max(high - low, high * 0.12, 1);
   const domainLow = Math.max(0, low - span * 0.18);
   const domainHigh = high + span * 0.18;
@@ -968,25 +970,26 @@ function buyBubbleChart(position, transactions) {
   };
   const tickStep = 10 ** Math.floor(Math.log10(Math.max((high - low) / 2, 0.000001)));
   const tickValues = [...new Set([low, (low + high) / 2, high].map((value) => Math.round(value / tickStep) * tickStep))];
-  const grid = tickValues.map((value) => `<g><line x1="${left}" x2="${right}" y1="${y(value).toFixed(1)}" y2="${y(value).toFixed(1)}" stroke="#52667c" stroke-dasharray="4 7" opacity=".72"/><text x="${left - 10}" y="${(y(value) + 4).toFixed(1)}" text-anchor="end" fill="#a5b6ca" font-size="11">${escapeHtml(formatPrice(value))}</text></g>`).join("");
-  const averageLine = `<line x1="${left}" x2="${right}" y1="${y(average).toFixed(1)}" y2="${y(average).toFixed(1)}" stroke="#d1a05a" stroke-dasharray="6 5"/><text x="${right}" y="${(y(average) - 8).toFixed(1)}" text-anchor="end" fill="#e5bc80" font-size="11">均價 ${escapeHtml(formatPrice(average))}</text>`;
+  const grid = tickValues.map((value) => `<g><line x1="${left}" x2="${right}" y1="${y(value).toFixed(1)}" y2="${y(value).toFixed(1)}" stroke="#476351" stroke-dasharray="4 7" opacity=".62"/><text x="${left - 10}" y="${(y(value) + 4).toFixed(1)}" text-anchor="end" fill="#91a99a" font-size="11">${escapeHtml(formatPrice(value))}</text></g>`).join("");
+  const averageLine = `<line x1="${left}" x2="${right}" y1="${y(average).toFixed(1)}" y2="${y(average).toFixed(1)}" stroke="#b1c994" stroke-dasharray="6 5"/><text x="${right}" y="${(y(average) - 8).toFixed(1)}" text-anchor="end" fill="#c6dda9" font-size="11">均價 ${escapeHtml(formatPrice(average))}</text>`;
+  const latestLine = latestPrice === null ? "" : `<line x1="${left}" x2="${right}" y1="${y(latestPrice).toFixed(1)}" y2="${y(latestPrice).toFixed(1)}" stroke="#88ff56" stroke-dasharray="3 5" stroke-width="1.5"/><text x="${left + 7}" y="${Math.max(top + 12, y(latestPrice) - 8).toFixed(1)}" fill="#b6f39a" font-size="11">${position.marketPriceStatus === "stale" ? "最近報價（過期）" : "最新價格"} ${escapeHtml(formatPrice(latestPrice))}</text>`;
   const maxShares = Math.max(...buys.map((row) => row.shares));
   const bubbles = buys.map((row, index) => {
     const radius = Math.max(7, Math.sqrt(row.shares / maxShares) * 25);
-    const fill = addIndex >= 0 && index >= addIndex ? "#d3a057" : "#61a9c1";
+    const fill = addIndex >= 0 && index >= addIndex ? "#b6dc77" : "#609d7d";
     const sharePercent = (row.shares / totalShares * 100).toFixed(1);
-    return `<circle class="buy-bubble-dot" tabindex="0" role="button" aria-label="${escapeHtml(`${row.date} 買入 ${formatPrice(row.price)}，數量 ${quantity(row.shares, position.quantityScale)}，占比 ${sharePercent}%`)}" data-date="${escapeHtml(row.date)}" data-price="${escapeHtml(formatPrice(row.price))}" data-shares="${escapeHtml(quantity(row.shares, position.quantityScale))}" data-share="${sharePercent}" cx="${x(index).toFixed(1)}" cy="${y(row.price).toFixed(1)}" r="${radius.toFixed(1)}" fill="${fill}" fill-opacity=".9" stroke="#c9d9e4" stroke-width="1.3"/>`;
+    return `<circle class="buy-bubble-dot" tabindex="0" role="button" aria-label="${escapeHtml(`${row.date} 買入 ${formatPrice(row.price)}，數量 ${quantity(row.shares, position.quantityScale)}，占比 ${sharePercent}%`)}" data-date="${escapeHtml(row.date)}" data-price="${escapeHtml(formatPrice(row.price))}" data-shares="${escapeHtml(quantity(row.shares, position.quantityScale))}" data-share="${sharePercent}" cx="${x(index).toFixed(1)}" cy="${y(row.price).toFixed(1)}" r="${radius.toFixed(1)}" fill="${fill}" fill-opacity=".9" stroke="#d4e8d8" stroke-width="1.3"/>`;
   }).join("");
   const dateIndexes = [...new Set([0, Math.round((buys.length - 1) / 3), Math.round((buys.length - 1) * 2 / 3), buys.length - 1])];
-  const dateLabels = dateIndexes.map((index) => `<text x="${x(index).toFixed(1)}" y="251" text-anchor="middle" fill="#aebed0" font-size="11">${escapeHtml(buys[index].date.slice(5).replace("-", "/"))}</text>`).join("");
+  const dateLabels = dateIndexes.map((index) => `<text x="${x(index).toFixed(1)}" y="251" text-anchor="middle" fill="#9db5a2" font-size="11">${escapeHtml(buys[index].date.slice(5).replace("-", "/"))}</text>`).join("");
   const highlightIndexes = [...new Set([0, addIndex, buys.length - 1].filter((index) => index >= 0))];
-  const highlights = highlightIndexes.map((index) => `<text x="${x(index).toFixed(1)}" y="${Math.max(18, y(buys[index].price) - 29).toFixed(1)}" text-anchor="middle" fill="${addIndex >= 0 && index >= addIndex ? "#efc381" : "#eef5f9"}" font-size="12" font-weight="700">${escapeHtml(Number(buys[index].price.toFixed(buys[index].price < 1 ? 6 : 2)).toString())}</text>`).join("");
+  const highlights = highlightIndexes.map((index) => `<text x="${x(index).toFixed(1)}" y="${Math.max(18, y(buys[index].price) - 29).toFixed(1)}" text-anchor="middle" fill="${addIndex >= 0 && index >= addIndex ? "#d4eeac" : "#edf8ef"}" font-size="12" font-weight="700">${escapeHtml(Number(buys[index].price.toFixed(buys[index].price < 1 ? 6 : 2)).toString())}</text>`).join("");
   return `<section class="buy-bubble" aria-label="${escapeHtml(position.displaySymbol)} 買入點位與加倉比例">
     <div class="buy-bubble-heading"><span>買入點位 × 加倉比例</span><small>${buys.length} 筆買入</small></div>
     <div class="buy-bubble-stats"><span><small>首次買入</small><strong class="private-number">${escapeHtml(formatPrice(first.price))}</strong></span><span><small>最後買入</small><strong class="private-number">${escapeHtml(formatPrice(last.price))}</strong></span><span><small>點位變化</small><strong class="private-number ${change < 0 ? "is-negative" : "is-positive"}">${change < 0 ? "−" : "+"}${Math.abs(change).toFixed(1)}%</strong></span></div>
-    <div class="buy-bubble-scroll" tabindex="0" aria-label="買入圖表，可左右捲動"><svg class="buy-bubble-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="group" aria-label="${escapeHtml(`${position.displaySymbol} 共 ${buys.length} 筆買入；首次 ${formatPrice(first.price)}，最後 ${formatPrice(last.price)}，平均 ${formatPrice(average)}`)}"><g class="buy-bubble-plot private-number">${grid}${averageLine}${bubbles}${highlights}</g>${dateLabels}</svg></div>
+    <div class="buy-bubble-scroll" tabindex="0" aria-label="買入圖表，可左右捲動"><svg class="buy-bubble-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="group" aria-label="${escapeHtml(`${position.displaySymbol} 共 ${buys.length} 筆買入；首次 ${formatPrice(first.price)}，最後 ${formatPrice(last.price)}，平均 ${formatPrice(average)}${latestPrice === null ? "" : `，最新價格 ${formatPrice(latestPrice)}`}`)}"><g class="buy-bubble-plot private-number">${grid}${averageLine}${latestLine}${bubbles}${highlights}</g>${dateLabels}</svg></div>
     <p class="buy-bubble-selected private-number" aria-live="polite">點選泡泡查看單筆買入</p>
-    <p class="buy-bubble-caption">依成交時間等距排列 · 圓面積代表每筆買入數量${addIndex >= 0 ? " · 金色為明顯加倉後的交易" : ""}</p>
+    <p class="buy-bubble-caption">依成交時間等距排列 · 圓面積代表每筆買入數量${addIndex >= 0 ? " · 亮綠色為明顯加倉後的交易" : ""}${latestPrice === null ? "" : position.marketPriceStatus === "stale" ? " · 亮綠虛線為最近報價（過期）" : " · 亮綠虛線為最新價格"}</p>
   </section>`;
 }
 
