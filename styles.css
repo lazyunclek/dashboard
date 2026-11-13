@@ -830,3 +830,26 @@ body.numbers-hidden .private-number { filter: blur(8px); user-select: none; }
   button:active { transform: none !important; }
   .tab-create:active span { transform: none !important; }
 }
+
+/* Screenshot presentation: all trades fit horizontally; zoom changes only price spacing. */
+.buy-bubble-expand { border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--accent); padding: 7px 9px; white-space: nowrap; font-size: 11px; }
+.buy-presentation { position: fixed; inset: 0; width: 100%; max-width: none; height: 100%; height: 100dvh; max-height: none; margin: 0; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); border: 0; background: #08110c; color: var(--text); box-sizing: border-box; overflow: hidden; }
+.buy-presentation[open] { display: flex; flex-direction: column; }
+.buy-presentation::backdrop { background: #08110c; }
+.buy-presentation-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px; flex-shrink: 0; }
+.buy-presentation-tools[hidden], .buy-presentation-restore[hidden] { display: none; }
+.buy-presentation-tools button, .buy-presentation-tools select, .buy-presentation-restore { padding: 9px; border: 1px solid var(--line); border-radius: 7px; background: #17281d; color: var(--text); }
+.buy-presentation-tools label { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.buy-presentation-tools small { width: 100%; color: var(--muted); font-size: 11px; }
+.buy-presentation-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.buy-presentation-image { flex-shrink: 0; box-sizing: border-box; overflow: hidden; background: #0c1911; touch-action: none; user-select: none; }
+.buy-presentation-title { padding: 12px 15px 0; color: var(--accent); font: 700 14px/1.4 var(--mono); }
+.buy-presentation-image .buy-bubble { border: 0; padding-top: 12px; }
+.buy-presentation-image .buy-bubble-heading { font-size: 12px; gap: 6px; }
+.buy-presentation-image .buy-bubble-stats { margin-top: 10px; gap: 5px; }
+.buy-presentation-image .buy-bubble-stats strong { font-size: 12px; }
+.buy-presentation-image .buy-bubble-scroll { overflow: hidden; }
+.buy-presentation-image .buy-bubble-svg { width: 100%; height: auto; }
+.buy-presentation-image .buy-bubble-selected { display: none; }
+.buy-presentation-image .buy-bubble-caption { margin-top: 6px; font-size: 9px; }
+.buy-presentation-restore { position: absolute; right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); font-size: 10px; opacity: .65; }

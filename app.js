@@ -923,7 +923,7 @@ function capitalRecoveryStatus(history) {
   return { label: "回本紀錄", title: "已清倉", detail: "未保留零成本持倉" };
 }
 
-function buyBubbleChart(position, transactions) {
+function buyBubbleChart(position, transactions, presentation = null) {
   const buys = transactions.filter((row) => row.transaction_type === "buy" && row.details?.event_role !== "asset_fee")
     .map((row) => {
       const shares = num(row.quantity);
@@ -945,12 +945,12 @@ function buyBubbleChart(position, transactions) {
     return values[Math.floor(values.length / 2)] || 0;
   };
   const addIndex = buys.findIndex((row, index) => index >= 2 && row.shares / totalShares >= 0.12 && row.shares >= 2 * priorMedian(index));
-  const width = Math.max(420, 95 + buys.length * 43);
-  const height = 272;
-  const left = 82;
-  const right = width - 25;
+  const width = presentation?.width || Math.max(420, 95 + buys.length * 43);
+  const height = presentation?.height || 272;
+  const left = presentation ? 92 : 82;
+  const right = width - (presentation ? 35 : 25);
   const top = 25;
-  const bottom = 211;
+  const bottom = height - 61;
   const prices = buys.map((row) => row.price);
   const latestPrice = num(position.marketPrice) > 0 && (!position.marketPriceCurrency || position.marketPriceCurrency === position.quoteCurrency)
     ? num(position.marketPrice) : null;
@@ -960,7 +960,11 @@ function buyBubbleChart(position, transactions) {
   const domainLow = Math.max(0, low - span * 0.18);
   const domainHigh = high + span * 0.18;
   const x = (index) => buys.length === 1 ? (left + right) / 2 : left + index * (right - left) / (buys.length - 1);
-  const y = (price) => bottom - (price - domainLow) / (domainHigh - domainLow) * (bottom - top);
+  if (presentation) { presentation.domainSpan = domainHigh - domainLow; presentation.defaultCenter = (domainLow + domainHigh) / 2; }
+  const axisZoom = presentation?.zoom || 1;
+  const axisCenter = presentation?.center ?? (domainLow + domainHigh) / 2;
+  const axisSpan = (domainHigh - domainLow) / axisZoom;
+  const y = (price) => bottom - (price - (axisCenter - axisSpan / 2)) / axisSpan * (bottom - top);
   const formatPrice = (price) => {
     if (price < 1 && position.quoteCurrency !== "TWD") {
       const digits = price < 0.01 ? 6 : 4;
@@ -975,22 +979,84 @@ function buyBubbleChart(position, transactions) {
   const latestLine = latestPrice === null ? "" : `<line x1="${left}" x2="${right}" y1="${y(latestPrice).toFixed(1)}" y2="${y(latestPrice).toFixed(1)}" stroke="#88ff56" stroke-dasharray="3 5" stroke-width="1.5"/><text x="${left + 7}" y="${Math.max(top + 12, y(latestPrice) - 8).toFixed(1)}" fill="#b6f39a" font-size="11">${position.marketPriceStatus === "stale" ? "最近報價（過期）" : "最新價格"} ${escapeHtml(formatPrice(latestPrice))}</text>`;
   const maxShares = Math.max(...buys.map((row) => row.shares));
   const bubbles = buys.map((row, index) => {
-    const radius = Math.max(7, Math.sqrt(row.shares / maxShares) * 25);
+    const radius = Math.max(presentation ? 2.5 : 7, Math.sqrt(row.shares / maxShares) * (presentation ? Math.min(18, Math.max(5, (right - left) / buys.length)) : 25));
     const fill = addIndex >= 0 && index >= addIndex ? "#b6dc77" : "#609d7d";
     const sharePercent = (row.shares / totalShares * 100).toFixed(1);
     return `<circle class="buy-bubble-dot" tabindex="0" role="button" aria-label="${escapeHtml(`${row.date} 買入 ${formatPrice(row.price)}，數量 ${quantity(row.shares, position.quantityScale)}，占比 ${sharePercent}%`)}" data-date="${escapeHtml(row.date)}" data-price="${escapeHtml(formatPrice(row.price))}" data-shares="${escapeHtml(quantity(row.shares, position.quantityScale))}" data-share="${sharePercent}" cx="${x(index).toFixed(1)}" cy="${y(row.price).toFixed(1)}" r="${radius.toFixed(1)}" fill="${fill}" fill-opacity=".9" stroke="#d4e8d8" stroke-width="1.3"/>`;
   }).join("");
   const dateIndexes = [...new Set([0, Math.round((buys.length - 1) / 3), Math.round((buys.length - 1) * 2 / 3), buys.length - 1])];
-  const dateLabels = dateIndexes.map((index) => `<text x="${x(index).toFixed(1)}" y="251" text-anchor="middle" fill="#9db5a2" font-size="11">${escapeHtml(buys[index].date.slice(5).replace("-", "/"))}</text>`).join("");
+  const dateLabels = dateIndexes.map((index) => `<text x="${x(index).toFixed(1)}" y="${height - 21}" text-anchor="middle" fill="#9db5a2" font-size="11">${escapeHtml(buys[index].date.slice(5).replace("-", "/"))}</text>`).join("");
   const highlightIndexes = [...new Set([0, addIndex, buys.length - 1].filter((index) => index >= 0))];
   const highlights = highlightIndexes.map((index) => `<text x="${x(index).toFixed(1)}" y="${Math.max(18, y(buys[index].price) - 29).toFixed(1)}" text-anchor="middle" fill="${addIndex >= 0 && index >= addIndex ? "#d4eeac" : "#edf8ef"}" font-size="12" font-weight="700">${escapeHtml(Number(buys[index].price.toFixed(buys[index].price < 1 ? 6 : 2)).toString())}</text>`).join("");
   return `<section class="buy-bubble" aria-label="${escapeHtml(position.displaySymbol)} 買入點位與加倉比例">
-    <div class="buy-bubble-heading"><span>買入點位 × 加倉比例</span><small>${buys.length} 筆買入</small></div>
+    <div class="buy-bubble-heading"><span>買入點位 × 加倉比例</span><small>${buys.length} 筆買入</small>${presentation ? "" : '<button type="button" class="buy-bubble-expand">⛶ 全螢幕</button>'}</div>
     <div class="buy-bubble-stats"><span><small>首次買入</small><strong class="private-number">${escapeHtml(formatPrice(first.price))}</strong></span><span><small>最後買入</small><strong class="private-number">${escapeHtml(formatPrice(last.price))}</strong></span><span><small>點位變化</small><strong class="private-number ${change < 0 ? "is-negative" : "is-positive"}">${change < 0 ? "−" : "+"}${Math.abs(change).toFixed(1)}%</strong></span></div>
-    <div class="buy-bubble-scroll" tabindex="0" aria-label="買入圖表，可左右捲動"><svg class="buy-bubble-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="group" aria-label="${escapeHtml(`${position.displaySymbol} 共 ${buys.length} 筆買入；首次 ${formatPrice(first.price)}，最後 ${formatPrice(last.price)}，平均 ${formatPrice(average)}${latestPrice === null ? "" : `，最新價格 ${formatPrice(latestPrice)}`}`)}"><g class="buy-bubble-plot private-number">${grid}${averageLine}${latestLine}${bubbles}${highlights}</g>${dateLabels}</svg></div>
+    <div class="buy-bubble-scroll" tabindex="0" aria-label="買入圖表，可左右捲動"><svg class="buy-bubble-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="group" aria-label="${escapeHtml(`${position.displaySymbol} 共 ${buys.length} 筆買入；首次 ${formatPrice(first.price)}，最後 ${formatPrice(last.price)}，平均 ${formatPrice(average)}${latestPrice === null ? "" : `，最新價格 ${formatPrice(latestPrice)}`}`)}"><defs><clipPath id="${presentation ? "expanded-buy-clip" : `buy-clip-${escapeHtml(position.id)}`}"><rect x="0" y="0" width="${width}" height="${bottom + 26}"/></clipPath></defs><g class="buy-bubble-plot private-number" clip-path="url(#${presentation ? "expanded-buy-clip" : `buy-clip-${escapeHtml(position.id)}`})">${grid}${averageLine}${latestLine}${bubbles}${highlights}</g>${dateLabels}</svg></div>
     <p class="buy-bubble-selected private-number" aria-live="polite">點選泡泡查看單筆買入</p>
     <p class="buy-bubble-caption">依成交時間等距排列 · 圓面積代表每筆買入數量${addIndex >= 0 ? " · 亮綠色為明顯加倉後的交易" : ""}${latestPrice === null ? "" : position.marketPriceStatus === "stale" ? " · 亮綠虛線為最近報價（過期）" : " · 亮綠虛線為最新價格"}</p>
   </section>`;
+}
+
+function openBuyBubblePresentation(position, transactions, trigger) {
+  const dialog = document.createElement("dialog");
+  dialog.className = "buy-presentation";
+  dialog.setAttribute("aria-label", `${position.displaySymbol} 點位圖截圖模式`);
+  dialog.innerHTML = `<div class="buy-presentation-tools"><label>圖片比例 <select aria-label="圖片比例"><option value="1">正方形 1:1</option><option value="0.8">直式 4:5</option><option value="1.5">橫式 3:2</option></select></label><button type="button" data-action="reset">重設</button><button type="button" data-action="hide">隱藏工具列</button><button type="button" data-action="close">關閉</button><label>垂直間距 <input type="range" min="0.5" max="5" step="0.05" value="1" aria-label="垂直間距"></label><small>雙指張合調整價格軸；放大後單指上下拖曳查看點位。點圖片外恢復工具列。</small></div><div class="buy-presentation-stage"><div class="buy-presentation-image"></div></div><button type="button" class="buy-presentation-restore" hidden>顯示工具列</button>`;
+  document.body.append(dialog);
+  const image = dialog.querySelector(".buy-presentation-image");
+  const stage = dialog.querySelector(".buy-presentation-stage");
+  const tools = dialog.querySelector(".buy-presentation-tools");
+  const restore = dialog.querySelector(".buy-presentation-restore");
+  const slider = dialog.querySelector("input");
+  let zoom = 1;
+  let center;
+  let domainSpan = 1;
+  let plotHeight = 1;
+  let gesture = null;
+  const draw = () => {
+    const ratio = Number(dialog.querySelector("select").value);
+    const width = Math.max(180, Math.min(stage.clientWidth - 24, (stage.clientHeight - 24) * ratio, 1000));
+    image.style.width = `${width}px`;
+    image.style.aspectRatio = String(ratio);
+    // Render at a stable logical width so labels stay readable on a phone.
+    const logicalWidth = 620;
+    const chartHeight = logicalWidth / ratio - 192;
+    const presentation = { width: logicalWidth, height: chartHeight, zoom, center };
+    image.innerHTML = `<div class="buy-presentation-title">${escapeHtml(position.displaySymbol)} · 買入紀錄</div>` + buyBubbleChart(position, transactions, presentation);
+    const svg = image.querySelector("svg");
+    domainSpan = presentation.domainSpan;
+    center ??= presentation.defaultCenter;
+    plotHeight = Math.max(1, svg.getBoundingClientRect().height * (chartHeight - 86) / chartHeight);
+    slider.value = String(zoom);
+  };
+  const showTools = (visible) => { tools.hidden = !visible; restore.hidden = visible; draw(); };
+  dialog.querySelector('[data-action="close"]').onclick = () => dialog.close();
+  dialog.querySelector('[data-action="hide"]').onclick = () => showTools(false);
+  restore.onclick = () => showTools(true);
+  stage.onclick = (event) => { if (event.target === stage) showTools(true); };
+  dialog.querySelector('[data-action="reset"]').onclick = () => { zoom = 1; center = undefined; draw(); };
+  dialog.querySelector("select").onchange = draw;
+  slider.oninput = () => { zoom = Number(slider.value); draw(); };
+  const distance = (touches) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+  image.addEventListener("touchstart", (event) => {
+    gesture = { distance: event.touches.length === 2 ? distance(event.touches) : 0, zoom, center, y: event.touches[0].clientY };
+  }, { passive: true });
+  image.addEventListener("touchmove", (event) => {
+    if (!gesture) return;
+    event.preventDefault();
+    if (event.touches.length === 2 && gesture.distance) zoom = Math.min(5, Math.max(.5, gesture.zoom * distance(event.touches) / gesture.distance));
+    else if (event.touches.length === 1) center = gesture.center + (event.touches[0].clientY - gesture.y) / plotHeight * domainSpan / zoom;
+    draw();
+  }, { passive: false });
+  image.addEventListener("touchend", () => { gesture = null; });
+  image.addEventListener("touchcancel", () => { gesture = null; });
+  const observer = new ResizeObserver(draw);
+  dialog.addEventListener("close", () => { observer.disconnect(); document.body.style.overflow = previousOverflow; dialog.remove(); trigger?.focus(); }, { once: true });
+  const previousOverflow = document.body.style.overflow;
+  document.body.style.overflow = "hidden";
+  dialog.showModal();
+  observer.observe(stage);
+  draw();
 }
 
 function positionCard(position) {
@@ -1100,6 +1166,9 @@ function positionCard(position) {
     <div class="position-ledger-actions" aria-label="${escapeHtml(position.displaySymbol)} 成交紀錄篩選">
       ${recoveryAction}${ledgerActions}
     </div>`;
+  details.querySelector(".buy-bubble-expand")?.addEventListener("click", (event) => {
+    openBuyBubblePresentation(position, ledgerTransactions, event.currentTarget);
+  });
   const bubbleSelected = details.querySelector(".buy-bubble-selected");
   details.querySelectorAll(".buy-bubble-dot").forEach((dot) => {
     const showTrade = () => {
